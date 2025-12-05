@@ -1,80 +1,115 @@
 import { InventoryItem, BorrowRecord, AppSettings, Category, ItemCondition } from '../types';
 import { DEFAULT_CATEGORIES } from '../constants';
 
-const API_URL = '/.netlify/functions/api';
-
-// --- Helper for API Calls ---
-async function apiCall<T>(action: string, method: string = 'GET', body?: any): Promise<T> {
-    const options: RequestInit = {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-    };
-    if (body) options.body = JSON.stringify(body);
-
-    // For GET requests, append action to query string
-    const url = method === 'GET' 
-        ? `${API_URL}?action=${action}`
-        : API_URL;
-
-    // For POST/PUT/DELETE, include action in body
-    if (method !== 'GET' && body) {
-        body.action = action;
-        options.body = JSON.stringify(body);
+// Mock Data Setup
+const MOCK_ITEMS: InventoryItem[] = [
+    {
+        id: 'BIO-001',
+        name: 'Compound Microscope',
+        category: 'Biology',
+        quantity: 55,
+        borrowedQuantity: 0,
+        unit: 'units',
+        location: 'Bio Lab, Cabinet 1',
+        condition: ItemCondition.Good,
+        description: 'High-power light microscope for viewing cells.',
+        safetyNotes: 'Handle with care.',
+        lastUpdated: new Date().toISOString(),
+        shortId: 'BIO-291'
     }
+];
 
-    const response = await fetch(url, options);
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'Unknown API Error' }));
-        throw new Error(err.error || `API Error: ${response.statusText}`);
-    }
-    return response.json();
-}
+// Helper to simulate network delay
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-// --- Inventory Functions ---
+// --- Inventory ---
 
 export const getInventory = async (): Promise<InventoryItem[]> => {
-    return apiCall<InventoryItem[]>('getInventory');
+    await delay(300);
+    const stored = localStorage.getItem('scilab_inventory');
+    if (!stored) {
+        localStorage.setItem('scilab_inventory', JSON.stringify(MOCK_ITEMS));
+        return MOCK_ITEMS;
+    }
+    return JSON.parse(stored);
 };
 
 export const saveItem = async (item: InventoryItem): Promise<boolean> => {
-    return apiCall<boolean>('saveItem', 'POST', { item });
+    await delay(300);
+    const items = await getInventory();
+    const index = items.findIndex(i => i.id === item.id);
+    if (index >= 0) {
+        items[index] = item;
+    } else {
+        // Generate Short ID if missing
+        if (!item.shortId) {
+             const prefix = item.category.substring(0, 3).toUpperCase();
+             const random = Math.floor(1000 + Math.random() * 9000);
+             item.shortId = `${prefix}-${random}`;
+        }
+        items.push(item);
+    }
+    localStorage.setItem('scilab_inventory', JSON.stringify(items));
+    return true;
 };
 
 export const deleteItem = async (id: string): Promise<boolean> => {
-    return apiCall<boolean>('deleteItem', 'POST', { id });
+    await delay(300);
+    let items = await getInventory();
+    items = items.filter(i => i.id !== id);
+    localStorage.setItem('scilab_inventory', JSON.stringify(items));
+    return true;
 };
 
-// --- Category Functions ---
+// --- Categories ---
 
 export const getCategories = async (): Promise<Category[]> => {
-    try {
-        return await apiCall<Category[]>('getCategories');
-    } catch (e) {
-        // Fallback if DB is empty
-        return DEFAULT_CATEGORIES.map(name => ({
-            id: name.toLowerCase().replace(/\s+/g, '-'),
-            name: name,
-            isDefault: true
-        }));
-    }
+    await delay(200);
+    const stored = localStorage.getItem('scilab_categories');
+    if (stored) return JSON.parse(stored);
+    
+    // Default
+    const defaults = DEFAULT_CATEGORIES.map(name => ({
+        id: name.toLowerCase().replace(/\s+/g, '-'),
+        name: name,
+        isDefault: true
+    }));
+    return defaults;
 };
 
 export const addCategory = async (name: string): Promise<boolean> => {
-    return apiCall<boolean>('addCategory', 'POST', { name });
+    await delay(200);
+    const cats = await getCategories();
+    cats.push({ id: name.toLowerCase().replace(/\s+/g, '-'), name });
+    localStorage.setItem('scilab_categories', JSON.stringify(cats));
+    return true;
 };
 
 export const updateCategory = async (id: string, name: string): Promise<boolean> => {
-    return apiCall<boolean>('updateCategory', 'POST', { id, name });
+    await delay(200);
+    const cats = await getCategories();
+    const idx = cats.findIndex(c => c.id === id);
+    if (idx !== -1) {
+        cats[idx].name = name;
+        localStorage.setItem('scilab_categories', JSON.stringify(cats));
+    }
+    return true;
 };
 
 export const deleteCategory = async (id: string): Promise<boolean> => {
-    return apiCall<boolean>('deleteCategory', 'POST', { id });
+    await delay(200);
+    let cats = await getCategories();
+    cats = cats.filter(c => c.id !== id);
+    localStorage.setItem('scilab_categories', JSON.stringify(cats));
+    return true;
 };
 
-// --- Borrowing Functions ---
+// --- Borrowing ---
 
 export const getBorrowRecords = async (): Promise<BorrowRecord[]> => {
-    return apiCall<BorrowRecord[]>('getBorrowRecords');
+    await delay(300);
+    const stored = localStorage.getItem('scilab_borrow_records');
+    return stored ? JSON.parse(stored) : [];
 };
 
 export const borrowItem = async (
@@ -85,35 +120,107 @@ export const borrowItem = async (
     dueDate: string,
     specificId?: string
 ): Promise<{ success: boolean; message?: string }> => {
-    return apiCall<{ success: boolean; message?: string }>('borrowItem', 'POST', {
-        itemId, borrowerName, borrowerId, quantity, dueDate, specificId
-    });
+    await delay(400);
+    const items = await getInventory();
+    const itemIndex = items.findIndex(i => i.id === itemId);
+    
+    if (itemIndex === -1) return { success: false, message: "Item not found" };
+    
+    const item = items[itemIndex];
+    const currentBorrowed = item.borrowedQuantity || 0;
+    
+    if (currentBorrowed + quantity > item.quantity) {
+        return { success: false, message: "Insufficient stock" };
+    }
+    
+    // Update Item
+    item.borrowedQuantity = currentBorrowed + quantity;
+    items[itemIndex] = item;
+    localStorage.setItem('scilab_inventory', JSON.stringify(items));
+    
+    // Create Record
+    const records = await getBorrowRecords();
+    const newRecord: BorrowRecord = {
+        id: Date.now().toString(),
+        itemId: item.id,
+        itemName: item.name,
+        itemCategory: item.category,
+        borrowerName,
+        borrowerId,
+        quantity,
+        borrowDate: new Date().toISOString().split('T')[0],
+        dueDate,
+        status: 'Borrowed',
+        specificId
+    };
+    records.push(newRecord);
+    localStorage.setItem('scilab_borrow_records', JSON.stringify(records));
+    
+    return { success: true };
 };
 
 export const returnItem = async (recordId: string): Promise<{ success: boolean }> => {
-    return apiCall<{ success: boolean }>('returnItem', 'POST', { recordId });
+    await delay(300);
+    const records = await getBorrowRecords();
+    const recordIndex = records.findIndex(r => r.id === recordId);
+    
+    if (recordIndex === -1) return { success: false };
+    
+    const record = records[recordIndex];
+    if (record.status === 'Returned') return { success: true };
+    
+    // Update Record
+    record.status = 'Returned';
+    record.returnDate = new Date().toISOString().split('T')[0];
+    records[recordIndex] = record;
+    localStorage.setItem('scilab_borrow_records', JSON.stringify(records));
+    
+    // Update Inventory
+    const items = await getInventory();
+    const itemIndex = items.findIndex(i => i.id === record.itemId);
+    if (itemIndex !== -1) {
+        const item = items[itemIndex];
+        // Ensure we don't go below zero
+        item.borrowedQuantity = Math.max(0, (item.borrowedQuantity || 0) - record.quantity);
+        items[itemIndex] = item;
+        localStorage.setItem('scilab_inventory', JSON.stringify(items));
+    }
+    
+    return { success: true };
 };
 
 export const returnItems = async (recordIds: string[]): Promise<{ success: boolean }> => {
-    return apiCall<{ success: boolean }>('returnItems', 'POST', { recordIds });
+    await delay(500);
+    // Process sequentially (in mock) to ensure consistency
+    for (const id of recordIds) {
+        await returnItem(id);
+    }
+    return { success: true };
 };
 
-// --- Settings Functions ---
+
+// --- Settings ---
 
 export const getSettings = async (): Promise<AppSettings> => {
-    const settings = await apiCall<AppSettings>('getSettings');
-    
-    // Merge with defaults to ensure all fields exist
+    await delay(200);
+    const stored = localStorage.getItem('scilab_settings');
     const DEFAULT_SETTINGS: AppSettings = {
         appName: 'STE Laboratory Inventory System',
         adminUsername: 'admin',
         adminPassword: 'admin123',
         recoveryEmail: 'admin@school.edu'
     };
-    
-    return { ...DEFAULT_SETTINGS, ...settings };
+    return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
 };
 
 export const saveSettings = async (settings: AppSettings): Promise<void> => {
-    await apiCall<void>('saveSettings', 'POST', { settings });
+    await delay(300);
+    try {
+        localStorage.setItem('scilab_settings', JSON.stringify(settings));
+    } catch (e: any) {
+        if (e.name === 'QuotaExceededError') {
+             throw new Error("Storage Limit Exceeded. Please try smaller images.");
+        }
+        throw e;
+    }
 };
