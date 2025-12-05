@@ -19,13 +19,9 @@ const MOCK_ITEMS: InventoryItem[] = [
     }
 ];
 
-// Helper to simulate network delay
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
 // --- Inventory ---
 
 export const getInventory = async (): Promise<InventoryItem[]> => {
-    await delay(300);
     const stored = localStorage.getItem('scilab_inventory');
     if (!stored) {
         localStorage.setItem('scilab_inventory', JSON.stringify(MOCK_ITEMS));
@@ -35,7 +31,6 @@ export const getInventory = async (): Promise<InventoryItem[]> => {
 };
 
 export const saveItem = async (item: InventoryItem): Promise<boolean> => {
-    await delay(300);
     const items = await getInventory();
     const index = items.findIndex(i => i.id === item.id);
     if (index >= 0) {
@@ -54,7 +49,6 @@ export const saveItem = async (item: InventoryItem): Promise<boolean> => {
 };
 
 export const deleteItem = async (id: string): Promise<boolean> => {
-    await delay(300);
     let items = await getInventory();
     items = items.filter(i => i.id !== id);
     localStorage.setItem('scilab_inventory', JSON.stringify(items));
@@ -64,7 +58,6 @@ export const deleteItem = async (id: string): Promise<boolean> => {
 // --- Categories ---
 
 export const getCategories = async (): Promise<Category[]> => {
-    await delay(200);
     const stored = localStorage.getItem('scilab_categories');
     if (stored) return JSON.parse(stored);
     
@@ -78,7 +71,6 @@ export const getCategories = async (): Promise<Category[]> => {
 };
 
 export const addCategory = async (name: string): Promise<boolean> => {
-    await delay(200);
     const cats = await getCategories();
     cats.push({ id: name.toLowerCase().replace(/\s+/g, '-'), name });
     localStorage.setItem('scilab_categories', JSON.stringify(cats));
@@ -86,7 +78,6 @@ export const addCategory = async (name: string): Promise<boolean> => {
 };
 
 export const updateCategory = async (id: string, name: string): Promise<boolean> => {
-    await delay(200);
     const cats = await getCategories();
     const idx = cats.findIndex(c => c.id === id);
     if (idx !== -1) {
@@ -97,7 +88,6 @@ export const updateCategory = async (id: string, name: string): Promise<boolean>
 };
 
 export const deleteCategory = async (id: string): Promise<boolean> => {
-    await delay(200);
     let cats = await getCategories();
     cats = cats.filter(c => c.id !== id);
     localStorage.setItem('scilab_categories', JSON.stringify(cats));
@@ -107,7 +97,6 @@ export const deleteCategory = async (id: string): Promise<boolean> => {
 // --- Borrowing ---
 
 export const getBorrowRecords = async (): Promise<BorrowRecord[]> => {
-    await delay(300);
     const stored = localStorage.getItem('scilab_borrow_records');
     return stored ? JSON.parse(stored) : [];
 };
@@ -120,7 +109,6 @@ export const borrowItem = async (
     dueDate: string,
     specificId?: string
 ): Promise<{ success: boolean; message?: string }> => {
-    await delay(400);
     const items = await getInventory();
     const itemIndex = items.findIndex(i => i.id === itemId);
     
@@ -160,7 +148,6 @@ export const borrowItem = async (
 };
 
 export const returnItem = async (recordId: string): Promise<{ success: boolean }> => {
-    await delay(300);
     const records = await getBorrowRecords();
     const recordIndex = records.findIndex(r => r.id === recordId);
     
@@ -190,8 +177,7 @@ export const returnItem = async (recordId: string): Promise<{ success: boolean }
 };
 
 export const returnItems = async (recordIds: string[]): Promise<{ success: boolean }> => {
-    await delay(500);
-    // Process sequentially (in mock) to ensure consistency
+    // Process sequentially to ensure consistency
     for (const id of recordIds) {
         await returnItem(id);
     }
@@ -202,7 +188,6 @@ export const returnItems = async (recordIds: string[]): Promise<{ success: boole
 // --- Settings ---
 
 export const getSettings = async (): Promise<AppSettings> => {
-    await delay(200);
     const stored = localStorage.getItem('scilab_settings');
     const DEFAULT_SETTINGS: AppSettings = {
         appName: 'STE Laboratory Inventory System',
@@ -214,7 +199,6 @@ export const getSettings = async (): Promise<AppSettings> => {
 };
 
 export const saveSettings = async (settings: AppSettings): Promise<void> => {
-    await delay(300);
     try {
         localStorage.setItem('scilab_settings', JSON.stringify(settings));
     } catch (e: any) {

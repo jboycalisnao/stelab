@@ -202,7 +202,7 @@ const App: React.FC = () => {
           <div className="h-screen w-screen flex items-center justify-center bg-gray-900 text-white">
               <div className="flex flex-col items-center gap-4">
                   <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
-                  <p>Connecting to Cloud...</p>
+                  <p>Loading...</p>
               </div>
           </div>
       );
@@ -302,7 +302,7 @@ const App: React.FC = () => {
                     {view === 'settings' && 'System Configuration'}
                     </h2>
                     <p className="text-gray-600 text-sm mt-1 font-medium">
-                        {isLoading ? 'Syncing with cloud...' : 'Manage your science assets efficiently.'}
+                        {isLoading ? 'Loading data...' : 'Manage your science assets efficiently.'}
                     </p>
                 </div>
                 {view === 'inventory' && !isMobile && (
