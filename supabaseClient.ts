@@ -27,23 +27,23 @@ const getEnvVar = (key: string): string => {
   return '';
 };
 
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
-const supabaseKey = getEnvVar('VITE_SUPABASE_KEY');
+// Use provided credentials as fallback if env vars fail
+const FALLBACK_URL = 'https://ewwadohdfmqfbdqndrhr.supabase.co';
+const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3d2Fkb2hkZm1xZmJkcW5kcmhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3NTg2MDQsImV4cCI6MjA4MDMzNDYwNH0.KU2yNQ_s8DSW3Urt39cJXzCoh02p4fynBzP8Li6x8dw';
 
-const isConfigured = 
-  supabaseUrl && 
-  supabaseKey && 
-  supabaseUrl !== 'https://placeholder.supabase.co' &&
-  !supabaseUrl.includes('placeholder');
+const envUrl = getEnvVar('VITE_SUPABASE_URL');
+const envKey = getEnvVar('VITE_SUPABASE_KEY');
 
-export const isSupabaseConfigured = !!isConfigured;
+// Prioritize Env Var, then Fallback
+const supabaseUrl = envUrl || FALLBACK_URL;
+const supabaseKey = envKey || FALLBACK_KEY;
+
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseKey);
 
 if (!isSupabaseConfigured) {
-  console.warn("Supabase is not configured. Falling back to Local Storage.");
+  console.error("CRITICAL: Supabase credentials missing. App will not function correctly.");
+} else {
+  console.log("Supabase Client Initialized with URL:", supabaseUrl);
 }
 
-// Use placeholders if missing to prevent createClient from throwing immediately
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseKey || 'placeholder'
-);
+export const supabase = createClient(supabaseUrl, supabaseKey);
