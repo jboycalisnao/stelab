@@ -76,3 +76,28 @@ export interface Category {
   name: string;
   isDefault?: boolean;
 }
+
+// --- Audit Logging Types ---
+
+export interface AuditDetail {
+  uniqueId: string;
+  seq: string;
+  status: 'present' | 'missing' | 'borrowed';
+}
+
+export interface AuditLog {
+  id: string;
+  date: string;
+  itemId: string;
+  itemName: string;
+  itemCategory: string;
+  itemLocation: string;
+  stats: {
+    total: number;
+    present: number;
+    borrowed: number;
+    missing: number;
+    accuracy: number;
+  };
+  details: AuditDetail[];
+}

@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIAnalysisResult } from "../types";
 
-const GEMINI_API_KEY = process.env.API_KEY || '';
+const GEMINI_API_KEY = process.env.API_KEY || 'AIzaSyDnTjbL0XCdV4XbuBR5MhOP5sd1hssQI0s';
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
