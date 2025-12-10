@@ -74,7 +74,8 @@ export const borrowItem = async (
 ): Promise<{ success: boolean; message?: string }> => {
     try {
         // We use a stored procedure (RPC) to handle the transaction (check stock -> update stock -> create record) atomically
-        const { data, error } = await supabase.rpc('borrow_item_transaction', {
+        // Using v2 to avoid ambiguous function call errors in Postgres
+        const { data, error } = await supabase.rpc('borrow_item_transaction_v2', {
             p_item_id: itemId,
             p_borrower_name: borrowerName,
             p_borrower_id: borrowerId,
