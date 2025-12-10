@@ -1,6 +1,9 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category } from './types';
 import * as storage from './services/storageService';
+import { supabase } from './supabaseClient';
 import Dashboard from './components/Dashboard';
 import InventoryList from './components/InventoryList';
 import LendingList from './components/LendingList';
@@ -8,6 +11,7 @@ import InventoryForm from './components/InventoryForm';
 import QRCodeModal from './components/QRCodeModal';
 import BulkBarcodeModal from './components/BulkBarcodeModal';
 import BorrowModal from './components/BorrowModal';
+import ReturnModal from './components/ReturnModal';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import Scanner from './components/Scanner';
@@ -35,8 +39,11 @@ const App: React.FC = () => {
   const [preSelectedBorrowItem, setPreSelectedBorrowItem] = useState<InventoryItem | undefined>(undefined);
   const [borrowSpecificId, setBorrowSpecificId] = useState<string | undefined>(undefined);
 
-  const refreshData = async () => {
-      setIsLoading(true);
+  // Return Modal State
+  const [returnModalState, setReturnModalState] = useState<{ isOpen: boolean; record?: BorrowRecord; item?: InventoryItem }>({ isOpen: false });
+
+  const refreshData = React.useCallback(async (silent = false) => {
+      if (!silent) setIsLoading(true);
       try {
           const [loadedItems, loadedRecords, loadedSettings, loadedCats] = await Promise.all([
               storage.getInventory(),
@@ -51,9 +58,9 @@ const App: React.FC = () => {
       } catch (e) {
           console.error("Data Load Error", e);
       } finally {
-          setIsLoading(false);
+          if (!silent) setIsLoading(false);
       }
-  };
+  }, []);
 
   useEffect(() => {
     const auth = localStorage.getItem('scilab_auth');
@@ -61,7 +68,19 @@ const App: React.FC = () => {
         setIsAuthenticated(true);
     }
     refreshData();
-  }, []);
+
+    // Real-time Subscriptions
+    const channels = [
+        supabase.channel('public:inventory_items').on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, () => refreshData(true)).subscribe(),
+        supabase.channel('public:borrow_records').on('postgres_changes', { event: '*', schema: 'public', table: 'borrow_records' }, () => refreshData(true)).subscribe(),
+        supabase.channel('public:app_settings').on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => refreshData(true)).subscribe(),
+        supabase.channel('public:categories').on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => refreshData(true)).subscribe(),
+    ];
+
+    return () => {
+        channels.forEach(ch => supabase.removeChannel(ch));
+    };
+  }, [refreshData]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -114,7 +133,8 @@ const App: React.FC = () => {
 
   const handleSave = async (item: InventoryItem) => {
     await storage.saveItem(item);
-    await refreshData();
+    // Refresh handled by subscription, but manual refresh ensures immediate local feedback if sub is slow
+    await refreshData(true);
     setIsFormOpen(false);
     setEditingItem(undefined);
   };
@@ -122,7 +142,7 @@ const App: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this item?")) {
       await storage.deleteItem(id);
-      await refreshData();
+      // Refresh handled by subscription
     }
   };
 
@@ -136,7 +156,7 @@ const App: React.FC = () => {
   ) => {
     const result = await storage.borrowItem(item.id, borrowerName, borrowerId, quantity, dueDate, specificId);
     if (result.success) {
-        await refreshData();
+        // Refresh handled by subscription
         setIsBorrowModalOpen(false);
         setPreSelectedBorrowItem(undefined);
         setBorrowSpecificId(undefined);
@@ -145,23 +165,29 @@ const App: React.FC = () => {
     }
   };
 
-  const handleReturn = async (recordId: string) => {
-      if(window.confirm("Confirm return of this item?")) {
-          const result = await storage.returnItem(recordId);
-          if (result.success) {
-              await refreshData();
-          } else {
-              alert("Failed to return item.");
-          }
+  const initiateReturn = (recordId: string) => {
+      const record = borrowRecords.find(r => r.id === recordId);
+      if (!record) return;
+      const item = items.find(i => i.id === record.itemId);
+      setReturnModalState({ isOpen: true, record, item });
+  };
+
+  const handleReturnConfirm = async (details: { good: number; defective: number; disposed: number }) => {
+      if (!returnModalState.record) return;
+      
+      const result = await storage.returnItem(returnModalState.record.id, details);
+      if (result.success) {
+          // Refresh handled by subscription
+          setReturnModalState({ isOpen: false });
+      } else {
+          alert(result.message || "Failed to return item.");
       }
   };
 
   const handleBulkReturn = async (recordIds: string[]) => {
-      if (window.confirm(`Confirm return of ${recordIds.length} selected items?`)) {
+      if (window.confirm(`Confirm return of ${recordIds.length} selected items? (Assumes all items are returned in good condition)`)) {
           const result = await storage.returnItems(recordIds);
-          if (result.success) {
-              await refreshData();
-          } else {
+          if (!result.success) {
               alert("Failed to return items.");
           }
       }
@@ -169,7 +195,7 @@ const App: React.FC = () => {
 
   const handleSettingsSave = async (newSettings: AppSettings) => {
       await storage.saveSettings(newSettings);
-      await refreshData();
+      // Refresh handled by subscription
   };
 
   const handlePasswordReset = async (newPassword: string) => {
@@ -336,13 +362,13 @@ const App: React.FC = () => {
                                     items={items}
                                     borrowRecords={borrowRecords}
                                     onBorrow={openBorrowModal}
-                                    onReturn={handleReturn}
+                                    onReturn={initiateReturn}
                                 />
                             )}
                             {view === 'lending' && !isMobile && (
                                 <LendingList 
                                     records={borrowRecords}
-                                    onReturn={handleReturn}
+                                    onReturn={initiateReturn}
                                     onReturnBulk={handleBulkReturn}
                                 />
                             )}
@@ -362,7 +388,25 @@ const App: React.FC = () => {
       {isFormOpen && <InventoryForm initialData={editingItem} categories={categories} onSubmit={handleSave} onCancel={() => setIsFormOpen(false)} />}
       {qrItem && <QRCodeModal item={qrItem} onClose={() => setQrItem(undefined)} />}
       {barcodeItem && <BulkBarcodeModal item={barcodeItem} onClose={() => setBarcodeItem(undefined)} />}
-      {isBorrowModalOpen && <BorrowModal availableItems={items} initialItem={preSelectedBorrowItem} specificId={borrowSpecificId} onConfirm={handleBorrowConfirm} onCancel={() => { setIsBorrowModalOpen(false); setBorrowSpecificId(undefined); }} />}
+      
+      {isBorrowModalOpen && (
+        <BorrowModal 
+            availableItems={items} 
+            initialItem={preSelectedBorrowItem} 
+            specificId={borrowSpecificId} 
+            onConfirm={handleBorrowConfirm} 
+            onCancel={() => { setIsBorrowModalOpen(false); setBorrowSpecificId(undefined); }} 
+        />
+      )}
+      
+      {returnModalState.isOpen && returnModalState.record && (
+          <ReturnModal
+            record={returnModalState.record}
+            item={returnModalState.item}
+            onConfirm={handleReturnConfirm}
+            onCancel={() => setReturnModalState({ isOpen: false })}
+          />
+      )}
     </div>
   );
 };

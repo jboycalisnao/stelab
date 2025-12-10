@@ -1,4 +1,5 @@
 
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -12,6 +13,7 @@ export interface InventoryItem {
   safetyNotes: string;
   lastUpdated: string;
   shortId?: string; // Unique short identifier for barcode generation (e.g., BIO-1024)
+  isConsumable?: boolean;
 }
 
 export enum ItemCondition {

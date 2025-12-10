@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { InventoryItem, ItemCondition, Category } from '../types';
 import { enrichTextData } from '../services/geminiService';
@@ -23,15 +24,20 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
       description: '',
       safetyNotes: '',
       borrowedQuantity: 0,
-      shortId: undefined
+      shortId: undefined,
+      isConsumable: false
     }
   );
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target;
+    if (type === 'checkbox') {
+        setFormData(prev => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }));
+    } else {
+        setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSmartEnrich = async () => {
@@ -159,6 +165,21 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                   placeholder="e.g. sets, pcs, boxes"
                 />
               </div>
+            </div>
+
+            {/* Consumable Toggle */}
+            <div className="flex items-center space-x-3 bg-white/40 p-3 rounded-lg border border-white/50">
+                <input
+                    type="checkbox"
+                    id="isConsumable"
+                    name="isConsumable"
+                    checked={formData.isConsumable || false}
+                    onChange={handleChange}
+                    className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                />
+                <label htmlFor="isConsumable" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                    Is this item a Consumable? <span className="text-gray-500 font-normal">(e.g., test tubes, pipettes, chemicals)</span>
+                </label>
             </div>
 
             {/* Short ID Display (Read Only) */}

@@ -1,4 +1,5 @@
 
+
 import { InventoryItem, BorrowRecord, AppSettings, Category, ItemCondition, AuditLog } from '../types';
 import { supabase } from '../supabaseClient';
 import { DEFAULT_CATEGORIES } from '../constants';
@@ -99,20 +100,81 @@ export const borrowItem = async (
     }
 };
 
-export const returnItem = async (recordId: string): Promise<{ success: boolean; message?: string }> => {
+export const returnItem = async (
+    recordId: string, 
+    details?: { good: number; defective: number; disposed: number }
+): Promise<{ success: boolean; message?: string }> => {
     try {
-        const { data, error } = await supabase.rpc('return_item_transaction', {
-            p_record_id: recordId,
-            p_return_date: new Date().toISOString().split('T')[0]
-        });
+        // 1. Fetch the Borrow Record
+        const { data: record, error: recError } = await supabase
+            .from('borrow_records')
+            .select('*')
+            .eq('id', recordId)
+            .single();
 
-        if (error) throw error;
+        if (recError || !record) throw new Error("Record not found");
+        if (record.status === 'Returned') return { success: true, message: "Already returned" };
 
-        if (data && data.success) {
-            return { success: true };
-        } else {
-            return { success: false, message: data?.message || "Return failed" };
+        const itemId = record.itemId;
+        const totalQty = record.quantity;
+
+        // Default details if not provided (assume all good)
+        const qtyGood = details?.good ?? totalQty;
+        const qtyDefective = details?.defective ?? 0;
+        const qtyDisposed = details?.disposed ?? 0;
+
+        // Sanity Check
+        if (qtyGood + qtyDefective + qtyDisposed !== totalQty) {
+             throw new Error("Quantity mismatch");
         }
+
+        // 2. Fetch the Inventory Item
+        const { data: item, error: itemError } = await supabase
+            .from('inventory_items')
+            .select('*')
+            .eq('id', itemId)
+            .single();
+
+        if (itemError || !item) throw new Error("Item not found");
+
+        // 3. Calculate Updates
+        // borrowedQuantity decreases by the TOTAL borrowed amount (since they are processed)
+        const newBorrowedQty = Math.max(0, item.borrowedQuantity - totalQty);
+        
+        // Total Quantity decreases by Disposed and Defective (Condemned) amounts
+        // We assume 'Defective' returns are removed from the active stock or need repair (not immediately available)
+        // For simplicity based on prompt: "input defects" -> likely implies removing them from 'Good' pool.
+        // If the user wants to keep them, they should ideally be moved to a different category, but here we just decrement main stock.
+        const removedFromStock = qtyDisposed + qtyDefective;
+        const newTotalQty = Math.max(0, item.quantity - removedFromStock);
+
+        // 4. Perform Updates (Sequential to simulate transaction)
+        
+        // A. Update Inventory
+        const { error: updateItemError } = await supabase
+            .from('inventory_items')
+            .update({
+                borrowedQuantity: newBorrowedQty,
+                quantity: newTotalQty,
+                lastUpdated: new Date().toISOString()
+            })
+            .eq('id', itemId);
+        
+        if (updateItemError) throw updateItemError;
+
+        // B. Update Borrow Record
+        const { error: updateRecError } = await supabase
+            .from('borrow_records')
+            .update({
+                status: 'Returned',
+                returnDate: new Date().toISOString().split('T')[0]
+            })
+            .eq('id', recordId);
+
+        if (updateRecError) throw updateRecError;
+
+        return { success: true };
+
     } catch (error: any) {
         console.error('Supabase Error (returnItem):', error.message);
         return { success: false, message: error.message };
@@ -121,8 +183,9 @@ export const returnItem = async (recordId: string): Promise<{ success: boolean; 
 
 export const returnItems = async (recordIds: string[]): Promise<{ success: boolean; message?: string }> => {
     try {
-        // Process sequentially to ensure inventory counts are accurate
+        // Process sequentially
         for (const id of recordIds) {
+            // Bulk return assumes all items are returned in good condition
             await returnItem(id);
         }
         return { success: true };
