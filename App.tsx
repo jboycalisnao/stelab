@@ -142,7 +142,7 @@ const App: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this item?")) {
       await storage.deleteItem(id);
-      // Refresh handled by subscription
+      await refreshData(true);
     }
   };
 
@@ -156,7 +156,7 @@ const App: React.FC = () => {
   ) => {
     const result = await storage.borrowItem(item.id, borrowerName, borrowerId, quantity, dueDate, specificId);
     if (result.success) {
-        // Refresh handled by subscription
+        await refreshData(true);
         setIsBorrowModalOpen(false);
         setPreSelectedBorrowItem(undefined);
         setBorrowSpecificId(undefined);
@@ -177,7 +177,7 @@ const App: React.FC = () => {
       
       const result = await storage.returnItem(returnModalState.record.id, details);
       if (result.success) {
-          // Refresh handled by subscription
+          await refreshData(true);
           setReturnModalState({ isOpen: false });
       } else {
           alert(result.message || "Failed to return item.");
@@ -187,7 +187,9 @@ const App: React.FC = () => {
   const handleBulkReturn = async (recordIds: string[]) => {
       if (window.confirm(`Confirm return of ${recordIds.length} selected items? (Assumes all items are returned in good condition)`)) {
           const result = await storage.returnItems(recordIds);
-          if (!result.success) {
+          if (result.success) {
+              await refreshData(true);
+          } else {
               alert("Failed to return items.");
           }
       }
@@ -195,7 +197,7 @@ const App: React.FC = () => {
 
   const handleSettingsSave = async (newSettings: AppSettings) => {
       await storage.saveSettings(newSettings);
-      // Refresh handled by subscription
+      await refreshData(true);
   };
 
   const handlePasswordReset = async (newPassword: string) => {
@@ -203,6 +205,7 @@ const App: React.FC = () => {
         const updatedSettings = { ...settings, adminPassword: newPassword };
         await storage.saveSettings(updatedSettings);
         setSettings(updatedSettings);
+        await refreshData(true);
     }
   };
 
