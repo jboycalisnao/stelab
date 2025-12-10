@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, BorrowRequest, RequestItem } from '../types';
 import * as storage from '../services/storageService';
@@ -99,19 +98,19 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/90 backdrop-blur-2xl rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col border border-white/50 overflow-hidden relative">
+      <div className="bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col border border-gray-200 overflow-hidden relative">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
             <X className="w-6 h-6" />
         </button>
 
         {/* Steps Header */}
-        <div className="bg-blue-600/90 p-6 text-white flex justify-between items-center">
+        <div className="bg-maroon-600 p-6 text-white flex justify-between items-center">
             <div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
                     <ShoppingBag className="w-6 h-6" />
                     Borrow Request
                 </h2>
-                <p className="text-blue-100 text-sm">Step {step} of 4</p>
+                <p className="text-maroon-100 text-sm">Step {step} of 4</p>
             </div>
         </div>
 
@@ -123,15 +122,15 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                     <h3 className="text-lg font-bold text-gray-800 border-b pb-2">Borrower Information</h3>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                        <input type="text" value={borrowerName} onChange={(e) => setBorrowerName(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="e.g. Juan Dela Cruz" />
+                        <input type="text" value={borrowerName} onChange={(e) => setBorrowerName(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-maroon-500 bg-white" placeholder="e.g. Juan Dela Cruz" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">ID Number / Grade & Section</label>
-                        <input type="text" value={borrowerId} onChange={(e) => setBorrowerId(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="e.g. 10-Newton / 2024-001" />
+                        <input type="text" value={borrowerId} onChange={(e) => setBorrowerId(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-maroon-500 bg-white" placeholder="e.g. 10-Newton / 2024-001" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Expected Return Date</label>
-                        <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                        <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-maroon-500 bg-white" />
                     </div>
                 </div>
             )}
@@ -146,7 +145,7 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                                 placeholder="Search equipment..." 
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border rounded-lg bg-white shadow-sm"
+                                className="w-full pl-10 pr-4 py-2 border rounded-lg bg-white shadow-sm focus:ring-2 focus:ring-maroon-500"
                             />
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                          </div>
@@ -157,9 +156,9 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                                  const canAdd = inCart < available;
 
                                  return (
-                                     <div key={item.id} className="bg-white p-3 rounded-lg border shadow-sm flex justify-between items-center group hover:border-blue-300 transition-all">
+                                     <div key={item.id} className="bg-white p-3 rounded-lg border shadow-sm flex justify-between items-center group hover:border-maroon-300 transition-all">
                                          <div className="flex items-center gap-3">
-                                             <div className="p-2 bg-gray-100 rounded-lg text-gray-600 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                             <div className="p-2 bg-gray-100 rounded-lg text-gray-600 group-hover:bg-maroon-50 group-hover:text-maroon-600 transition-colors">
                                                 {getCategoryIcon(item.category)}
                                              </div>
                                              <div>
@@ -170,7 +169,7 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                                          <button 
                                             onClick={() => addItem(item)} 
                                             disabled={!canAdd}
-                                            className={`p-2 rounded-full transition-colors ${canAdd ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' : 'bg-gray-100 text-gray-300 cursor-not-allowed'}`}
+                                            className={`p-2 rounded-full transition-colors ${canAdd ? 'bg-maroon-100 text-maroon-600 hover:bg-maroon-200' : 'bg-gray-100 text-gray-300 cursor-not-allowed'}`}
                                          >
                                              <Plus className="w-4 h-4" />
                                          </button>
@@ -184,7 +183,7 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                     <div className="w-80 bg-white p-4 rounded-xl border shadow-sm flex flex-col">
                         <h4 className="font-bold text-gray-800 mb-4 pb-2 border-b flex justify-between items-center">
                             Your Request
-                            <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">{selectedItems.length}</span>
+                            <span className="bg-maroon-600 text-white text-xs px-2 py-0.5 rounded-full">{selectedItems.length}</span>
                         </h4>
                         <div className="flex-1 overflow-y-auto space-y-3">
                             {selectedItems.length === 0 ? (
@@ -217,7 +216,7 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                 <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in slide-in-from-right-8 duration-300">
                      <h3 className="text-xl font-bold text-gray-800 text-center">Review Your Request</h3>
                      
-                     <div className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
+                     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
                          <div className="grid grid-cols-2 gap-4 text-sm">
                              <div>
                                  <span className="block text-gray-500">Name</span>
@@ -229,7 +228,7 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                              </div>
                              <div className="col-span-2">
                                  <span className="block text-gray-500">Return Date</span>
-                                 <span className="font-bold text-blue-600">{returnDate}</span>
+                                 <span className="font-bold text-maroon-600">{returnDate}</span>
                              </div>
                          </div>
 
@@ -267,7 +266,7 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                     </div>
 
                     <div className="bg-white p-6 rounded-xl shadow-lg border-2 border-dashed border-gray-300">
-                         <h3 className="text-3xl font-mono font-bold text-blue-600 tracking-wider mb-4">{createdRequest.referenceCode}</h3>
+                         <h3 className="text-3xl font-mono font-bold text-maroon-600 tracking-wider mb-4">{createdRequest.referenceCode}</h3>
                          <img src={qrUrl} alt="QR Code" className="w-48 h-48 mx-auto mix-blend-multiply" />
                          <p className="text-xs text-gray-400 mt-2">Scan to track status</p>
                     </div>
@@ -310,7 +309,7 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                             }
                             setStep(prev => (prev + 1) as any);
                         }} 
-                        className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 shadow-md font-medium"
+                        className="flex items-center gap-2 bg-maroon-600 text-white px-6 py-2.5 rounded-lg hover:bg-maroon-700 shadow-md font-medium"
                     >
                         Next Step <ArrowRight className="w-4 h-4" />
                     </button>

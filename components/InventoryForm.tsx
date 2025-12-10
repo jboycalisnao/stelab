@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { InventoryItem, ItemCondition, Category } from '../types';
 import { enrichTextData } from '../services/geminiService';
@@ -73,8 +71,8 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white/80 backdrop-blur-2xl rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-white/50">
-        <div className="p-6 border-b border-white/40 flex justify-between items-center bg-white/40 rounded-t-2xl sticky top-0 z-10">
+      <div className="bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-200">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50/50 rounded-t-2xl sticky top-0 z-10">
           <h2 className="text-xl font-bold text-gray-800">
             {initialData ? 'Edit Equipment' : 'Add New Equipment'}
           </h2>
@@ -94,7 +92,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="flex-1 px-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400 backdrop-blur-sm shadow-sm"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400 shadow-sm bg-white"
                   placeholder="e.g. Bunsen Burner"
                   required
                 />
@@ -102,7 +100,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                   type="button"
                   onClick={handleSmartEnrich}
                   disabled={isAnalyzing || !formData.name}
-                  className="px-3 py-2 bg-purple-100/80 text-purple-700 rounded-lg hover:bg-purple-200/90 disabled:opacity-50 transition-colors flex items-center gap-2 font-medium text-sm backdrop-blur-sm shadow-sm"
+                  className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 disabled:opacity-50 transition-colors flex items-center gap-2 font-medium text-sm border border-purple-200 shadow-sm"
                   title="Auto-fill details using AI"
                 >
                   {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -119,10 +117,10 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                   name="category"
                   value={formData.category}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 backdrop-blur-sm shadow-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 shadow-sm bg-white"
                 >
                   {categories.map(cat => (
-                    <option key={cat.id} value={cat.name} className="bg-white text-gray-900">{cat.name}</option>
+                    <option key={cat.id} value={cat.name} className="text-gray-900">{cat.name}</option>
                   ))}
                 </select>
               </div>
@@ -133,10 +131,10 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                   name="condition"
                   value={formData.condition}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 backdrop-blur-sm shadow-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 shadow-sm bg-white"
                 >
                   {Object.values(ItemCondition).map(cond => (
-                    <option key={cond} value={cond} className="bg-white text-gray-900">{cond}</option>
+                    <option key={cond} value={cond} className="text-gray-900">{cond}</option>
                   ))}
                 </select>
               </div>
@@ -149,7 +147,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                   min="1"
                   value={formData.quantity}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 backdrop-blur-sm shadow-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 shadow-sm bg-white"
                   required
                 />
               </div>
@@ -161,14 +159,14 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                   name="unit"
                   value={formData.unit}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 backdrop-blur-sm shadow-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 shadow-sm bg-white"
                   placeholder="e.g. sets, pcs, boxes"
                 />
               </div>
             </div>
 
             {/* Consumable Toggle */}
-            <div className="flex items-center space-x-3 bg-white/40 p-3 rounded-lg border border-white/50">
+            <div className="flex items-center space-x-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <input
                     type="checkbox"
                     id="isConsumable"
@@ -190,7 +188,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                         type="text"
                         value={initialData.shortId}
                         readOnly
-                        className="w-full px-4 py-2 border border-white/60 bg-gray-100/50 rounded-lg text-gray-600 font-mono text-sm backdrop-blur-sm shadow-sm cursor-not-allowed"
+                        className="w-full px-4 py-2 border border-gray-200 bg-gray-100 rounded-lg text-gray-600 font-mono text-sm shadow-sm cursor-not-allowed"
                     />
                 </div>
             )}
@@ -202,7 +200,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 backdrop-blur-sm shadow-sm"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 shadow-sm bg-white"
                 placeholder="e.g. Chemistry Lab, Cabinet A"
                 required
               />
@@ -215,7 +213,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                 value={formData.description}
                 onChange={handleChange}
                 rows={3}
-                className="w-full px-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 backdrop-blur-sm shadow-sm"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 shadow-sm bg-white"
                 placeholder="Technical specifications..."
               />
             </div>
@@ -227,23 +225,23 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                 value={formData.safetyNotes}
                 onChange={handleChange}
                 rows={2}
-                className="w-full px-4 py-2 border border-red-200/60 bg-red-50/50 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900 placeholder-gray-400 backdrop-blur-sm shadow-sm"
+                className="w-full px-4 py-2 border border-red-200 bg-red-50/50 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900 placeholder-gray-400 shadow-sm"
                 placeholder="Handling precautions..."
               />
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-white/30">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={onCancel}
-              className="px-6 py-2 border border-white/60 rounded-lg text-gray-700 hover:bg-white/50 transition-colors backdrop-blur-sm"
+              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-blue-600/90 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md"
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md"
             >
               Save Equipment
             </button>

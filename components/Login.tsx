@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { FlaskConical, Lock, User, AlertCircle, Eye, EyeOff, Mail, ArrowRight, ArrowLeft, KeyRound, Loader2, Send, ShoppingBag, Search, QrCode } from 'lucide-react';
 import { AppSettings, BorrowRequest } from '../types';
@@ -163,7 +161,7 @@ const Login: React.FC<LoginProps> = ({
       switch (status) {
           case 'Approved': return 'text-green-600 bg-green-50 border-green-200';
           case 'Pending': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-          case 'Rejected': return 'text-red-600 bg-red-50 border-red-200';
+          case 'Rejected': return 'text-maroon-600 bg-maroon-50 border-maroon-200';
           case 'Completed': return 'text-blue-600 bg-blue-50 border-blue-200';
           case 'Released': return 'text-indigo-600 bg-indigo-50 border-indigo-200';
           case 'Returned': return 'text-teal-600 bg-teal-50 border-teal-200';
@@ -190,17 +188,17 @@ const Login: React.FC<LoginProps> = ({
       </div>
 
       {/* Main Card */}
-      <div className="relative z-10 w-full max-w-4xl bg-white/80 backdrop-blur-xl border border-white/60 rounded-2xl shadow-xl overflow-hidden flex flex-col min-h-[500px]">
+      <div className="relative z-10 w-full max-w-4xl bg-white/90 backdrop-blur-xl border border-gray-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-[500px]">
         
         {viewMode === 'landing' && (
             <div className="flex-1 flex flex-col animate-in fade-in zoom-in duration-300">
                 {/* Main Content: Student Portal */}
                 <div className="flex-1 p-8 md:p-12 flex flex-col justify-center items-center relative group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-transparent opacity-50"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-maroon-50 to-transparent opacity-50"></div>
                     <div className="relative z-10 text-center space-y-8 w-full max-w-2xl">
                         <div>
-                            <div className="bg-blue-100/50 p-5 rounded-full inline-flex mb-4">
-                                <ShoppingBag className="w-12 h-12 text-blue-600" />
+                            <div className="bg-maroon-100/50 p-5 rounded-full inline-flex mb-4">
+                                <ShoppingBag className="w-12 h-12 text-maroon-600" />
                             </div>
                             <h3 className="text-3xl font-bold text-gray-800">Student / Guest Portal</h3>
                             <p className="text-gray-500 mt-2 text-lg">Browse available equipment and submit borrow requests instantly.</p>
@@ -209,7 +207,7 @@ const Login: React.FC<LoginProps> = ({
                         <div className="flex justify-center">
                             <button 
                                 onClick={() => setShowRequestModal(true)}
-                                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all hover:scale-105 flex items-center gap-3 text-lg"
+                                className="px-8 py-4 bg-maroon-600 hover:bg-maroon-700 text-white rounded-xl font-bold shadow-lg shadow-maroon-200 transition-all hover:scale-105 flex items-center gap-3 text-lg"
                             >
                                 <ShoppingBag className="w-6 h-6" /> Start Request
                             </button>
@@ -224,9 +222,9 @@ const Login: React.FC<LoginProps> = ({
                                     value={trackCode}
                                     onChange={(e) => setTrackCode(e.target.value)}
                                     placeholder="Enter Reference Code (e.g. REQ-1234)" 
-                                    className="w-full pl-4 pr-12 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                    className="w-full pl-4 pr-12 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-maroon-500 outline-none transition-all"
                                 />
-                                <button type="submit" className="absolute right-2 top-2 bottom-2 p-2 text-gray-400 hover:text-blue-600">
+                                <button type="submit" className="absolute right-2 top-2 bottom-2 p-2 text-gray-400 hover:text-maroon-600">
                                     {isTrackLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : <Search className="w-5 h-5" />}
                                 </button>
                             </form>

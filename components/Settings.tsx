@@ -144,21 +144,21 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
       setEditingCategory(null);
   };
 
-  const CardGlass = "bg-white/70 backdrop-blur-xl border border-white/50 rounded-xl shadow-sm";
+  const CardStyle = "bg-white border border-gray-200 rounded-xl shadow-lg";
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className={`${CardGlass} p-8 h-fit`}>
+        <div className={`${CardStyle} p-8 h-fit`}>
             <h3 className="text-xl font-bold text-gray-800 mb-6">General Settings</h3>
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Application Name</label>
-                  <input type="text" name="appName" value={formData.appName} onChange={handleChange} className="w-full px-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500 backdrop-blur-sm" placeholder="e.g. STE Lab System" />
+                  <input type="text" name="appName" value={formData.appName} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500" placeholder="e.g. STE Lab System" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Custom Footer Text</label>
                   <div className="relative">
-                      <input type="text" name="customFooterText" value={formData.customFooterText || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500 backdrop-blur-sm" placeholder="e.g. Property of Leon National High School" />
+                      <input type="text" name="customFooterText" value={formData.customFooterText || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500" placeholder="e.g. Property of Leon National High School" />
                       <Type className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                   </div>
                 </div>
@@ -167,11 +167,11 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Header Logo</label>
                   <div className="flex items-center space-x-6">
-                      <div className="w-20 h-20 bg-white/40 rounded-lg flex items-center justify-center overflow-hidden border border-white/50 shadow-inner">
+                      <div className="w-20 h-20 bg-gray-50 rounded-lg flex items-center justify-center overflow-hidden border border-gray-200 shadow-inner">
                       {isProcessing ? <Loader2 className="w-6 h-6 text-blue-500 animate-spin" /> : formData.logoUrl ? <img src={formData.logoUrl} alt="Logo Preview" className="w-full h-full object-contain" /> : <span className="text-gray-400 text-xs text-center px-2">No Logo</span>}
                       </div>
                       <div className="space-y-2">
-                          <button type="button" onClick={() => logoInputRef.current?.click()} disabled={isProcessing} className="flex items-center space-x-2 px-4 py-2 border border-white/60 bg-white/40 rounded-lg hover:bg-white/60 text-sm font-medium text-gray-700 transition-colors disabled:opacity-50"><Upload className="w-4 h-4" /><span>Upload New Logo</span></button>
+                          <button type="button" onClick={() => logoInputRef.current?.click()} disabled={isProcessing} className="flex items-center space-x-2 px-4 py-2 border border-gray-300 bg-white rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 transition-colors disabled:opacity-50"><Upload className="w-4 h-4" /><span>Upload New Logo</span></button>
                           <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
                           {formData.logoUrl && !isProcessing && <button type="button" onClick={handleRemoveImage} className="text-sm text-red-500 hover:text-red-700 block">Remove Logo</button>}
                       </div>
@@ -179,20 +179,20 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
                 </div>
 
                 {/* Admin Credentials */}
-                <div className="pt-4 border-t border-white/40">
+                <div className="pt-4 border-t border-gray-100">
                   <h4 className="text-md font-bold text-gray-800 mb-4 flex items-center gap-2"><Lock className="w-4 h-4 text-gray-500" />Admin Account</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
                         <div className="relative">
-                            <input type="text" name="adminUsername" value={formData.adminUsername || 'admin'} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 backdrop-blur-sm" />
+                            <input type="text" name="adminUsername" value={formData.adminUsername || 'admin'} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900" />
                             <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
                         <div className="relative">
-                            <input type={showAdminPassword ? "text" : "password"} name="adminPassword" value={formData.adminPassword || 'admin123'} onChange={handleChange} className="w-full pl-10 pr-10 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 backdrop-blur-sm" />
+                            <input type={showAdminPassword ? "text" : "password"} name="adminPassword" value={formData.adminPassword || 'admin123'} onChange={handleChange} className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900" />
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                             <button type="button" onClick={() => setShowAdminPassword(!showAdminPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">{showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
                         </div>
@@ -201,34 +201,34 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
                   <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Recovery Email</label>
                       <div className="relative">
-                          <input type="email" name="recoveryEmail" value={formData.recoveryEmail || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 backdrop-blur-sm" />
+                          <input type="email" name="recoveryEmail" value={formData.recoveryEmail || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900" />
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                       </div>
                   </div>
                 </div>
 
                 {/* EmailJS */}
-                <div className="pt-4 border-t border-white/40">
+                <div className="pt-4 border-t border-gray-100">
                   <h4 className="text-md font-bold text-gray-800 mb-4 flex items-center gap-2"><Mail className="w-4 h-4 text-gray-500" />Email Service Configuration (EmailJS)</h4>
                   <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Service ID</label>
                         <div className="relative">
-                            <input type="text" name="emailJsServiceId" value={formData.emailJsServiceId || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 backdrop-blur-sm" />
+                            <input type="text" name="emailJsServiceId" value={formData.emailJsServiceId || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900" />
                             <Server className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Template ID</label>
                         <div className="relative">
-                            <input type="text" name="emailJsTemplateId" value={formData.emailJsTemplateId || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 backdrop-blur-sm" />
+                            <input type="text" name="emailJsTemplateId" value={formData.emailJsTemplateId || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900" />
                             <FileCode className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Public Key</label>
                         <div className="relative">
-                            <input type={showEmailJsKey ? "text" : "password"} name="emailJsPublicKey" value={formData.emailJsPublicKey || ''} onChange={handleChange} className="w-full pl-10 pr-10 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 backdrop-blur-sm" />
+                            <input type={showEmailJsKey ? "text" : "password"} name="emailJsPublicKey" value={formData.emailJsPublicKey || ''} onChange={handleChange} className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900" />
                             <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                             <button type="button" onClick={() => setShowEmailJsKey(!showEmailJsKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">{showEmailJsKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
                         </div>
@@ -236,7 +236,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-white/30 flex items-center justify-end">
+                <div className="pt-4 border-t border-gray-100 flex items-center justify-end">
                 <button type="submit" disabled={isSaving || isProcessing} className={`flex items-center space-x-2 px-6 py-2 rounded-lg transition-colors font-medium ${isSaving || isProcessing ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'} text-white shadow-md`}>
                     {(isSaving || isProcessing) ? <Loader2 className="w-4 h-4 animate-spin" /> : (saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />)}
                     <span>{isProcessing ? 'Processing...' : (isSaving ? 'Saving...' : (saved ? 'Saved!' : 'Save Settings'))}</span>
@@ -246,14 +246,14 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
         </div>
 
         {/* Category Management */}
-        <div className={`${CardGlass} p-8 h-fit`}>
+        <div className={`${CardStyle} p-8 h-fit`}>
             <h3 className="text-xl font-bold text-gray-800 mb-6">Manage Categories</h3>
             <div className="space-y-4">
                 <div className="flex gap-2">
-                    <input type="text" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="New category name..." className="flex-1 px-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500 backdrop-blur-sm" />
+                    <input type="text" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="New category name..." className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500" />
                     <button onClick={handleAddCategory} disabled={!newCategory.trim()} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"><Plus className="w-5 h-5" /></button>
                 </div>
-                <ul className="divide-y divide-gray-100/50 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                <ul className="divide-y divide-gray-100 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                     {categories.map(cat => (
                         <li key={cat.id} className="py-3 flex justify-between items-center group">
                             {editingCategory?.id === cat.id ? (

@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import { InventoryItem } from '../types';
 import { X, Printer } from 'lucide-react';
@@ -94,10 +93,10 @@ const BulkBarcodeModal: React.FC<BulkBarcodeModalProps> = ({ item, onClose }) =>
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/90 backdrop-blur-2xl rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-white/50">
+      <div className="bg-white/95 backdrop-blur-2xl rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-200">
         
         {/* Header */}
-        <div className="p-4 border-b border-gray-200/50 flex justify-between items-center bg-white/40 rounded-t-xl">
+        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50 rounded-t-xl">
           <div>
             <h3 className="text-lg font-bold text-gray-800">Bulk Barcode Printing</h3>
             <p className="text-sm text-gray-500">Generating {item.quantity} unique labels for {item.name}</p>
@@ -115,10 +114,10 @@ const BulkBarcodeModal: React.FC<BulkBarcodeModalProps> = ({ item, onClose }) =>
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200/50 bg-white/40 rounded-b-xl flex justify-end space-x-3">
+        <div className="p-4 border-t border-gray-200 bg-gray-50/50 rounded-b-xl flex justify-end space-x-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white/50 transition-colors text-sm font-medium"
+            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white transition-colors text-sm font-medium"
           >
             Close
           </button>

@@ -1,8 +1,6 @@
-
-
 import React, { useState, useMemo } from 'react';
 import { BorrowRecord, BorrowRequest } from '../types';
-import { Search, RotateCcw, CheckSquare, Square, ChevronDown, ChevronRight, Package, Trash2 } from 'lucide-react';
+import { Search, RotateCcw, CheckSquare, Square, ChevronDown, ChevronRight, Package, Trash2, AlertCircle } from 'lucide-react';
 import { getCategoryIcon, getCategoryColor } from '../constants';
 
 interface LendingListProps {
@@ -16,17 +14,22 @@ interface LendingListProps {
 
 const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, onReturnBulk, onDelete, onDeleteBulk }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'All' | 'Borrowed' | 'Returned'>('All');
+  const [filterStatus, setFilterStatus] = useState<'All' | 'Borrowed' | 'Overdue' | 'Returned'>('All');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
-  // Create Lookup Map for Request Reference Codes
+  const isOverdue = (dueDate: string) => {
+    return new Date(dueDate) < new Date() && new Date().toISOString().split('T')[0] !== dueDate;
+  };
+
+  // Create Lookup Map for Request Reference Codes AND Request IDs
   const recordRequestMap = useMemo(() => {
-      const map = new Map<string, string>(); // recordId -> refCode
+      // Map linkedRecordId -> { code, id }
+      const map = new Map<string, { code: string, id: string }>(); 
       requests.forEach(req => {
           req.items.forEach(item => {
               if (item.linkedRecordId) {
-                  map.set(item.linkedRecordId, req.referenceCode);
+                  map.set(item.linkedRecordId, { code: req.referenceCode, id: req.id });
               }
           });
       });
@@ -36,16 +39,22 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
   // 1. Filter Records
   const filteredRecords = useMemo(() => {
      return records.filter(record => {
-        const refCode = recordRequestMap.get(record.id) || '';
+        const reqData = recordRequestMap.get(record.id);
+        const refCode = reqData?.code || '';
+        const reqId = reqData?.id || '';
         
         const matchesSearch = 
             record.itemName.toLowerCase().includes(searchTerm.toLowerCase()) || 
             record.borrowerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            refCode.toLowerCase().includes(searchTerm.toLowerCase());
+            refCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            reqId.toLowerCase().includes(searchTerm.toLowerCase()); // Search by Request ID (UUID)
         
+        const isOverdueItem = isOverdue(record.dueDate) && record.status === 'Borrowed';
+
         const matchesStatus = filterStatus === 'All' || 
             (filterStatus === 'Borrowed' && record.status === 'Borrowed') ||
-            (filterStatus === 'Returned' && record.status === 'Returned');
+            (filterStatus === 'Returned' && record.status === 'Returned') ||
+            (filterStatus === 'Overdue' && isOverdueItem);
 
         return matchesSearch && matchesStatus;
     }).sort((a, b) => new Date(b.borrowDate).getTime() - new Date(a.borrowDate).getTime());
@@ -75,10 +84,6 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
       if (newSet.has(itemId)) newSet.delete(itemId);
       else newSet.add(itemId);
       setExpandedItems(newSet);
-  };
-
-  const isOverdue = (dueDate: string) => {
-    return new Date(dueDate) < new Date() && new Date().toISOString().split('T')[0] !== dueDate;
   };
 
   const toggleSelect = (id: string) => {
@@ -119,9 +124,9 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
   };
 
   return (
-    <div className="bg-white/70 backdrop-blur-xl rounded-xl shadow-sm border border-white/50 flex flex-col h-[calc(100vh-200px)]">
+    <div className="bg-white rounded-xl shadow-xl border border-gray-200 flex flex-col h-[calc(100vh-200px)]">
       {/* Toolbar */}
-      <div className="p-4 border-b border-white/40 flex flex-col sm:flex-row gap-4 justify-between items-center bg-white/30 rounded-t-xl flex-shrink-0">
+      <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row gap-4 justify-between items-center bg-gray-50/50 rounded-t-xl flex-shrink-0">
         <div className="relative w-full sm:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
           <input
@@ -129,7 +134,7 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
             placeholder="Search by item, borrower, or Request ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-800 placeholder-gray-500 backdrop-blur-sm"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-800 placeholder-gray-500 shadow-sm"
           />
         </div>
         
@@ -153,12 +158,12 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
                 </div>
             )}
 
-            <div className="flex bg-white/40 rounded-lg p-1 border border-white/40">
-                {(['All', 'Borrowed', 'Returned'] as const).map(status => (
+            <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-200">
+                {(['All', 'Borrowed', 'Overdue', 'Returned'] as const).map(status => (
                     <button 
                         key={status}
                         onClick={() => setFilterStatus(status)}
-                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${filterStatus === status ? 'bg-white/80 text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${filterStatus === status ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
                     >
                         {status === 'Borrowed' ? 'Active' : status}
                     </button>
@@ -168,7 +173,7 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
       </div>
 
       {/* Grouped List */}
-      <div className="flex-1 overflow-auto p-4 space-y-3">
+      <div className="flex-1 overflow-auto p-4 space-y-3 bg-gray-100/50">
         {sortedGroupKeys.length > 0 ? sortedGroupKeys.map(itemId => {
             const { name, category } = getItemDetails(itemId);
             const { active, overdue } = getGroupSummary(itemId);
@@ -176,19 +181,22 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
             const recs = groupedRecords[itemId];
 
             return (
-                <div key={itemId} className="bg-white/40 border border-white/50 rounded-xl overflow-hidden shadow-sm transition-all hover:bg-white/50">
+                <div key={itemId} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all hover:shadow-md">
                     <div 
                         className="p-4 flex items-center justify-between cursor-pointer select-none"
                         onClick={() => toggleExpand(itemId)}
                     >
                         <div className="flex items-center space-x-4">
-                             <div className={`p-2 rounded-lg bg-white/60 border border-white/50 shadow-sm transition-transform ${isExpanded ? 'scale-110' : ''}`}>
+                             <div className={`p-2 rounded-lg bg-gray-50 border border-gray-100 shadow-sm transition-transform ${isExpanded ? 'scale-110' : ''}`}>
                                 <div style={{ color: getCategoryColor(category) }}>
                                     {getCategoryIcon(category)}
                                 </div>
                              </div>
                              <div>
-                                 <h4 className="font-bold text-gray-800">{name}</h4>
+                                 <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                                    {name}
+                                    {overdue > 0 && <AlertCircle className="w-4 h-4 text-red-500" />}
+                                 </h4>
                                  <div className="flex gap-2 text-xs mt-1">
                                      <span className="text-gray-500">{category}</span>
                                      <span className="text-gray-300">•</span>
@@ -204,9 +212,9 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
                     </div>
 
                     {isExpanded && (
-                        <div className="border-t border-white/40 bg-white/30 animate-in slide-in-from-top-2 duration-200">
+                        <div className="border-t border-gray-100 bg-gray-50/50 animate-in slide-in-from-top-2 duration-200">
                             <table className="w-full text-left border-collapse">
-                                <thead className="bg-white/20 text-xs font-semibold text-gray-500 uppercase">
+                                <thead className="bg-gray-100/50 text-xs font-semibold text-gray-500 uppercase">
                                     <tr>
                                         <th className="px-4 py-2 w-10"></th>
                                         <th className="px-4 py-2">Borrower</th>
@@ -216,9 +224,13 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
                                         <th className="px-4 py-2 text-right">Action</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100/50">
-                                    {recs.map(record => (
-                                        <tr key={record.id} className={`hover:bg-white/40 transition-colors ${selectedIds.has(record.id) ? 'bg-indigo-50/40' : ''}`}>
+                                <tbody className="divide-y divide-gray-100">
+                                    {recs.map(record => {
+                                        const reqData = recordRequestMap.get(record.id);
+                                        const overdueItem = isOverdue(record.dueDate) && record.status === 'Borrowed';
+                                        
+                                        return (
+                                        <tr key={record.id} className={`hover:bg-white transition-colors ${selectedIds.has(record.id) ? 'bg-indigo-50/40' : (overdueItem ? 'bg-red-50/50' : '')}`}>
                                             <td className="px-4 py-3 text-center">
                                                 <button 
                                                     onClick={(e) => { e.stopPropagation(); toggleSelect(record.id); }} 
@@ -230,9 +242,9 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900 text-sm">{record.borrowerName}</div>
                                                 <div className="text-xs text-gray-500">{record.borrowerId}</div>
-                                                {recordRequestMap.get(record.id) && (
+                                                {reqData && (
                                                     <div className="text-[10px] text-blue-600 font-mono mt-0.5 flex items-center gap-1">
-                                                        <span className="opacity-75">REF:</span> {recordRequestMap.get(record.id)}
+                                                        <span className="opacity-75">REF:</span> {reqData.code}
                                                     </div>
                                                 )}
                                             </td>
@@ -245,7 +257,7 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
                                                     {record.status === 'Returned' ? (
                                                         <span className="text-green-600 font-medium">In: {record.returnDate}</span>
                                                     ) : (
-                                                        <span className={`${isOverdue(record.dueDate) ? 'text-red-600 font-bold' : 'text-indigo-600'}`}>
+                                                        <span className={`${overdueItem ? 'text-red-600 font-bold' : 'text-indigo-600'}`}>
                                                             Due: {record.dueDate}
                                                         </span>
                                                     )}
@@ -253,11 +265,11 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
                                             </td>
                                             <td className="px-4 py-3">
                                                 {record.status === 'Returned' ? (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100/80 text-green-700 backdrop-blur-sm">Returned</span>
-                                                ) : isOverdue(record.dueDate) ? (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100/80 text-red-700 backdrop-blur-sm">Overdue</span>
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700">Returned</span>
+                                                ) : overdueItem ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700 border border-red-200">Overdue</span>
                                                 ) : (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100/80 text-indigo-700 backdrop-blur-sm">Active</span>
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700">Active</span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-right">
@@ -265,7 +277,7 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
                                                     {record.status === 'Borrowed' && (
                                                         <button 
                                                             onClick={(e) => { e.stopPropagation(); onReturn(record.id); }}
-                                                            className="inline-flex items-center space-x-1 px-2 py-1 bg-green-50/50 text-green-700 hover:bg-green-100 rounded text-xs font-medium transition-colors border border-green-200/50"
+                                                            className="inline-flex items-center space-x-1 px-2 py-1 bg-green-50 text-green-700 hover:bg-green-100 rounded text-xs font-medium transition-colors border border-green-200"
                                                             title="Return Item"
                                                         >
                                                             <RotateCcw className="w-3 h-3" />
@@ -274,7 +286,7 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
                                                     )}
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); onDelete(record.id); }}
-                                                        className="inline-flex items-center space-x-1 px-2 py-1 bg-red-50/50 text-red-700 hover:bg-red-100 rounded text-xs font-medium transition-colors border border-red-200/50"
+                                                        className="inline-flex items-center space-x-1 px-2 py-1 bg-red-50 text-red-700 hover:bg-red-100 rounded text-xs font-medium transition-colors border border-red-200"
                                                         title="Delete Record"
                                                     >
                                                         <Trash2 className="w-3 h-3" />
@@ -282,7 +294,7 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))}
+                                    )}) }
                                 </tbody>
                             </table>
                         </div>

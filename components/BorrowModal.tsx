@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { InventoryItem } from '../types';
 import { X, HandPlatter, Search, Tag } from 'lucide-react';
@@ -46,8 +45,8 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/90 backdrop-blur-2xl rounded-xl shadow-2xl w-full max-w-md relative overflow-hidden border border-white/50">
-        <div className="bg-blue-600/90 px-6 py-4 flex justify-between items-center backdrop-blur-sm">
+      <div className="bg-white backdrop-blur-2xl rounded-xl shadow-2xl w-full max-w-md relative overflow-hidden border border-gray-200">
+        <div className="bg-blue-600 px-6 py-4 flex justify-between items-center">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <HandPlatter className="w-5 h-5" />
                 {initialItem ? 'Borrow Item' : 'New Loan'}
@@ -62,14 +61,14 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">Equipment *</label>
             {initialItem ? (
-                <div className="bg-blue-50/60 p-4 rounded-lg border border-blue-100/50 backdrop-blur-sm">
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                     <h4 className="font-semibold text-blue-900">{initialItem.name}</h4>
                     <div className="text-sm text-blue-700 flex justify-between mt-1">
                         <span>Total: {initialItem.quantity}</span>
                         <span className="font-bold">Available: {available}</span>
                     </div>
                     {specificId && (
-                        <div className="mt-2 flex items-center gap-2 text-xs font-mono bg-blue-100/50 text-blue-800 px-2 py-1 rounded w-fit">
+                        <div className="mt-2 flex items-center gap-2 text-xs font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded w-fit">
                             <Tag className="w-3 h-3" />
                             Unit ID: {specificId}
                         </div>
@@ -85,11 +84,11 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
                         }}
                         required
                         disabled={!!specificId}
-                        className="w-full px-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 appearance-none backdrop-blur-sm shadow-sm disabled:bg-gray-200"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 appearance-none shadow-sm bg-white disabled:bg-gray-100"
                     >
-                        <option value="" disabled className="bg-white text-gray-500">Select Equipment...</option>
+                        <option value="" disabled className="text-gray-500">Select Equipment...</option>
                         {stockItems.map(item => (
-                            <option key={item.id} value={item.id} className="bg-white text-gray-900">
+                            <option key={item.id} value={item.id} className="text-gray-900">
                                 {item.name} ({item.quantity - (item.borrowedQuantity || 0)} avail)
                             </option>
                         ))}
@@ -115,7 +114,7 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
               required
               value={borrowerName}
               onChange={(e) => setBorrowerName(e.target.value)}
-              className="w-full px-4 py-2 border border-white/60 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white/50 backdrop-blur-sm shadow-sm"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white shadow-sm"
               placeholder="e.g. Juan Dela Cruz"
             />
           </div>
@@ -127,7 +126,7 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
               required
               value={borrowerId}
               onChange={(e) => setBorrowerId(e.target.value)}
-              className="w-full px-4 py-2 border border-white/60 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white/50 backdrop-blur-sm shadow-sm"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white shadow-sm"
               placeholder="e.g. 2024-1001"
             />
           </div>
@@ -143,7 +142,7 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
                 disabled={!selectedItem || !!specificId} // Disable quantity editing if specific unit
                 value={quantity}
                 onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
-                className="w-full px-4 py-2 border border-white/60 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white/50 backdrop-blur-sm shadow-sm disabled:bg-gray-100/50 disabled:text-gray-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white shadow-sm disabled:bg-gray-100 disabled:text-gray-500"
                 />
             </div>
             <div>
@@ -153,7 +152,7 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
                 required
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-4 py-2 border border-white/60 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white/50 backdrop-blur-sm shadow-sm"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white shadow-sm"
                 />
             </div>
           </div>
@@ -162,7 +161,7 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 px-4 py-2 border border-white/60 rounded-lg text-gray-700 hover:bg-white/50 font-medium backdrop-blur-sm"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
             >
               Cancel
             </button>

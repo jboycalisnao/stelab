@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BorrowRecord, InventoryItem } from '../types';
 import { X, RotateCcw, AlertTriangle, Trash2, CheckCircle } from 'lucide-react';
@@ -34,8 +33,8 @@ const ReturnModal: React.FC<ReturnModalProps> = ({ record, item, onConfirm, onCa
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/90 backdrop-blur-2xl rounded-xl shadow-2xl w-full max-w-md relative overflow-hidden border border-white/50 animate-in fade-in zoom-in duration-200">
-        <div className="bg-green-600/90 px-6 py-4 flex justify-between items-center backdrop-blur-sm">
+      <div className="bg-white backdrop-blur-2xl rounded-xl shadow-2xl w-full max-w-md relative overflow-hidden border border-gray-200 animate-in fade-in zoom-in duration-200">
+        <div className="bg-green-600 px-6 py-4 flex justify-between items-center">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <RotateCcw className="w-5 h-5" />
                 Return Equipment
@@ -46,7 +45,7 @@ const ReturnModal: React.FC<ReturnModalProps> = ({ record, item, onConfirm, onCa
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            <div className="bg-gray-50/80 p-4 rounded-lg border border-gray-200">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <p className="text-sm text-gray-500 mb-1">Returning Item:</p>
                 <p className="font-bold text-gray-800 text-lg">{record.itemName}</p>
                 <div className="flex justify-between mt-2 text-sm">

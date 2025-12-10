@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { BorrowRequest, RequestStatus } from '../types';
 import * as storage from '../services/storageService';
@@ -104,7 +102,6 @@ const RequestsList: React.FC<RequestsListProps> = () => {
         async () => {
              setProcessingId(request.id);
              // We use a custom status 'Released' which isn't in the strict enum initially but we can cast or handle it
-             // Actually, let's update status to 'Released' (we need to ensure types allow it or just use string)
              await storage.updateBorrowRequestStatus(request.id, 'Released' as RequestStatus);
              await loadRequests();
              setProcessingId(null);
@@ -235,20 +232,20 @@ const RequestsList: React.FC<RequestsListProps> = () => {
 
   const getStatusBadge = (status: RequestStatus | string) => {
       switch (status) {
-          case 'Approved': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Approved</span>;
-          case 'Pending': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">Pending</span>;
-          case 'Rejected': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">Rejected</span>;
-          case 'Completed': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">Completed (Returned)</span>;
-          case 'Released': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">Released</span>;
-          case 'Returned': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-700">Returned</span>;
-          default: return <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">{status}</span>;
+          case 'Approved': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">Approved</span>;
+          case 'Pending': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700 border border-yellow-200">Pending</span>;
+          case 'Rejected': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">Rejected</span>;
+          case 'Completed': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">Completed</span>;
+          case 'Released': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">Released</span>;
+          case 'Returned': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-700 border border-teal-200">Returned</span>;
+          default: return <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">{status}</span>;
       }
   };
 
   return (
-    <div className="bg-white/70 backdrop-blur-xl rounded-xl shadow-sm border border-white/50 flex flex-col h-[calc(100vh-200px)]">
+    <div className="bg-white rounded-xl shadow-xl border border-gray-200 flex flex-col h-[calc(100vh-200px)]">
         {/* Toolbar */}
-        <div className="p-4 border-b border-white/40 flex flex-col sm:flex-row gap-4 justify-between items-center bg-white/30 rounded-t-xl">
+        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row gap-4 justify-between items-center bg-gray-50/50 rounded-t-xl">
              <div className="relative w-full sm:w-96">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
                 <input
@@ -256,16 +253,16 @@ const RequestsList: React.FC<RequestsListProps> = () => {
                     placeholder="Search by borrower, code, item name, or ID..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm backdrop-blur-sm"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"
                 />
             </div>
             
-            <div className="flex bg-white/40 rounded-lg p-1 border border-white/40">
+            <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-200">
                 {(['All', 'Pending', 'Approved', 'Released'] as const).map(status => (
                     <button 
                         key={status}
                         onClick={() => setStatusFilter(status)}
-                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${statusFilter === status ? 'bg-white/80 text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${statusFilter === status ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
                     >
                         {status}
                     </button>
@@ -274,15 +271,15 @@ const RequestsList: React.FC<RequestsListProps> = () => {
         </div>
 
         {/* List */}
-        <div className="flex-1 overflow-auto p-4 space-y-4">
+        <div className="flex-1 overflow-auto p-4 space-y-4 bg-gray-100/50">
             {loading ? (
                 <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-blue-500"/></div>
             ) : filteredRequests.length > 0 ? (
                 filteredRequests.map(req => (
-                    <div key={req.id} className="bg-white/50 border border-white/50 rounded-xl p-4 shadow-sm hover:bg-white/70 transition-colors">
+                    <div key={req.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-all">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div className="flex items-start gap-4">
-                                <div className="p-3 bg-white rounded-lg border shadow-sm text-center min-w-[80px]">
+                                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 shadow-sm text-center min-w-[80px]">
                                     <span className="block text-xs text-gray-400 font-mono">CODE</span>
                                     <span className="block font-bold text-gray-800 tracking-tight">{req.referenceCode}</span>
                                 </div>
@@ -291,11 +288,12 @@ const RequestsList: React.FC<RequestsListProps> = () => {
                                     <p className="text-sm text-gray-500">{req.borrowerId} • {new Date(req.requestDate).toLocaleDateString()}</p>
                                     <div className="mt-2 flex flex-wrap gap-2">
                                         {req.items.map((item, idx) => (
-                                            <span key={idx} className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs border">
-                                                {item.quantity}x {item.itemName}
+                                            <span key={idx} className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs border border-gray-200 flex items-center gap-1">
+                                                <span className="font-semibold">{item.quantity}x</span> {item.itemName}
                                             </span>
                                         ))}
                                     </div>
+                                    <div className="text-[10px] text-gray-400 mt-1 font-mono">ID: {req.id}</div>
                                 </div>
                             </div>
 

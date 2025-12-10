@@ -149,14 +149,14 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
   };
 
   return (
-    <div className="bg-white/70 backdrop-blur-xl rounded-xl shadow-sm border border-white/50 flex flex-col h-[calc(100vh-200px)]">
+    <div className="bg-white rounded-xl shadow-xl border border-gray-200 flex flex-col h-[calc(100vh-200px)]">
       {/* Header Tabs */}
-      <div className="flex border-b border-white/40 bg-white/30 rounded-t-xl px-4 pt-4 gap-1">
+      <div className="flex border-b border-gray-200 bg-gray-50/50 rounded-t-xl px-4 pt-4 gap-1">
           <button
             onClick={() => setActiveTab('list')}
             className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors flex items-center gap-2 ${
                 activeTab === 'list' 
-                ? 'bg-white/60 text-blue-700 border-t border-x border-white/50 shadow-sm mb-[-1px] z-10' 
+                ? 'bg-white text-blue-700 border-t border-x border-gray-200 shadow-sm mb-[-1px] z-10' 
                 : 'text-gray-500 hover:bg-white/40 hover:text-gray-700'
             }`}
           >
@@ -167,7 +167,7 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
             onClick={() => setActiveTab('report')}
             className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors flex items-center gap-2 ${
                 activeTab === 'report' 
-                ? 'bg-white/60 text-blue-700 border-t border-x border-white/50 shadow-sm mb-[-1px] z-10' 
+                ? 'bg-white text-blue-700 border-t border-x border-gray-200 shadow-sm mb-[-1px] z-10' 
                 : 'text-gray-500 hover:bg-white/40 hover:text-gray-700'
             }`}
           >
@@ -179,7 +179,7 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
       {activeTab === 'list' && (
         <>
             {/* List Toolbar */}
-            <div className="p-4 border-b border-white/40 flex flex-col sm:flex-row gap-4 justify-between items-center bg-white/20">
+            <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row gap-4 justify-between items-center bg-white">
                 <div className="relative w-full sm:w-96">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
                 <input
@@ -187,14 +187,14 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                     placeholder="Search equipment, location, or ID..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-800 placeholder-gray-500 backdrop-blur-sm"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-800 placeholder-gray-500 shadow-sm"
                 />
                 </div>
                 
                 <div className="flex items-center space-x-2 w-full sm:w-auto">
                 <Filter className="text-gray-500 w-4 h-4" />
                 <select 
-                    className="border border-white/60 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer bg-white/50 text-gray-800 backdrop-blur-sm"
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer bg-white text-gray-800 shadow-sm"
                     value={filterCategory}
                     onChange={(e) => setFilterCategory(e.target.value)}
                 >
@@ -207,9 +207,9 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
             </div>
 
             {/* List Table */}
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto bg-gray-50">
                 <table className="w-full text-left border-collapse">
-                <thead className="bg-white/50 sticky top-0 z-10 backdrop-blur-md">
+                <thead className="bg-white sticky top-0 z-10 shadow-sm border-b border-gray-200">
                     <tr>
                     <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Item Name</th>
                     <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
@@ -219,12 +219,12 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                     <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider text-right">Actions</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100/50">
+                <tbody className="divide-y divide-gray-200 bg-white">
                     {filteredItems.length > 0 ? filteredItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-white/40 transition-colors group">
+                    <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
                         <td className="px-6 py-4">
                         <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 rounded-lg bg-white/60 flex items-center justify-center flex-shrink-0 overflow-hidden border border-white/50 shadow-sm">
+                            <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 overflow-hidden border border-gray-200 shadow-sm">
                                 <div style={{ color: getCategoryColor(item.category) }}>
                                 {getCategoryIcon(item.category)}
                                 </div>
@@ -232,12 +232,12 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                             <div>
                             <div className="font-medium text-gray-900">{item.name}</div>
                             <div className="text-xs text-gray-500 truncate max-w-[200px]">{item.description}</div>
-                            {item.shortId && <div className="text-[10px] text-gray-400 font-mono mt-0.5 bg-gray-100/50 inline-block px-1 rounded border border-gray-200/50">{item.shortId}</div>}
+                            {item.shortId && <div className="text-[10px] text-gray-400 font-mono mt-0.5 bg-gray-100 inline-block px-1 rounded border border-gray-200">{item.shortId}</div>}
                             </div>
                         </div>
                         </td>
                         <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/60 border border-white/40 text-gray-800 shadow-sm">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 border border-gray-200 text-gray-800">
                             {item.category}
                         </span>
                         </td>
@@ -262,7 +262,7 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                             disabled={(item.quantity - (item.borrowedQuantity || 0)) <= 0}
                             className={`p-1.5 rounded-md transition-colors ${
                                 (item.quantity - (item.borrowedQuantity || 0)) > 0 
-                                ? 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50' 
+                                ? 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50' 
                                 : 'text-gray-300 cursor-not-allowed'
                             }`}
                             title="Borrow Item"
@@ -271,28 +271,28 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                             </button>
                             <button 
                             onClick={() => onPrintBarcodes(item)}
-                            className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50/50 rounded-md transition-colors"
+                            className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
                             title="Print Bulk Barcodes"
                             >
                             <Barcode className="w-4 h-4" />
                             </button>
                             <button 
                             onClick={() => onShowQR(item)}
-                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-md transition-colors"
+                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
                             title="View QR Code"
                             >
                             <QrCode className="w-4 h-4" />
                             </button>
                             <button 
                             onClick={() => onEdit(item)}
-                            className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50/50 rounded-md transition-colors"
+                            className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors"
                             title="Edit Item"
                             >
                             <Edit2 className="w-4 h-4" />
                             </button>
                             <button 
                             onClick={() => onDelete(item.id)}
-                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50/50 rounded-md transition-colors"
+                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                             title="Delete Item"
                             >
                             <Trash2 className="w-4 h-4" />
@@ -314,7 +314,7 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
       )}
 
       {activeTab === 'report' && (
-          <div className="flex-1 overflow-auto p-6 space-y-8 animate-in fade-in duration-300">
+          <div className="flex-1 overflow-auto p-6 space-y-8 animate-in fade-in duration-300 bg-gray-50">
               {/* Report Header */}
               <div className="flex justify-between items-start">
                   <div>
@@ -332,27 +332,27 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
 
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white/50 border border-white/50 p-6 rounded-xl shadow-sm text-center">
+                  <div className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm text-center">
                       <div className="text-3xl font-bold text-gray-900">{reportData.totalItems}</div>
                       <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold mt-1">Unique Items</div>
                   </div>
-                  <div className="bg-white/50 border border-white/50 p-6 rounded-xl shadow-sm text-center">
+                  <div className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm text-center">
                       <div className="text-3xl font-bold text-blue-700">{reportData.totalQty}</div>
                       <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold mt-1">Total Assets (Qty)</div>
                   </div>
-                  <div className="bg-white/50 border border-white/50 p-6 rounded-xl shadow-sm text-center">
+                  <div className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm text-center">
                       <div className="text-3xl font-bold text-indigo-700">{reportData.totalBorrowed}</div>
                       <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold mt-1">Currently On Loan</div>
                   </div>
               </div>
 
               {/* Category Table */}
-              <div className="bg-white/50 border border-white/50 rounded-xl overflow-hidden shadow-sm">
-                  <div className="px-6 py-4 bg-white/40 border-b border-white/40">
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                       <h4 className="font-bold text-gray-800">Breakdown by Category</h4>
                   </div>
                   <table className="w-full text-left">
-                      <thead className="bg-white/30 text-xs uppercase text-gray-500">
+                      <thead className="bg-white text-xs uppercase text-gray-500">
                           <tr>
                               <th className="px-6 py-3">Category</th>
                               <th className="px-6 py-3">Unique Items</th>
@@ -360,9 +360,9 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                               <th className="px-6 py-3">On Loan</th>
                           </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100/50">
+                      <tbody className="divide-y divide-gray-100">
                           {reportData.byCategory.map(cat => (
-                              <tr key={cat.name} className="hover:bg-white/30">
+                              <tr key={cat.name} className="hover:bg-gray-50">
                                   <td className="px-6 py-3 font-medium text-gray-800">{cat.name}</td>
                                   <td className="px-6 py-3 text-gray-600">{cat.count}</td>
                                   <td className="px-6 py-3 text-gray-600">{cat.qty}</td>
@@ -376,14 +376,14 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
               {/* Alerts Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Low Stock */}
-                  <div className="bg-white/50 border border-white/50 rounded-xl overflow-hidden shadow-sm">
-                       <div className="px-6 py-4 bg-amber-50/50 border-b border-white/40 flex items-center gap-2">
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                       <div className="px-6 py-4 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
                           <AlertTriangle className="w-5 h-5 text-amber-600" />
                           <h4 className="font-bold text-gray-800">Low Stock Alerts</h4>
                       </div>
                       <div className="max-h-64 overflow-y-auto">
                         <table className="w-full text-left">
-                            <tbody className="divide-y divide-gray-100/50">
+                            <tbody className="divide-y divide-gray-100">
                                 {reportData.lowStock.length > 0 ? reportData.lowStock.map(i => (
                                     <tr key={i.id}>
                                         <td className="px-6 py-3 text-sm text-gray-800">{i.name}</td>
@@ -400,14 +400,14 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                   </div>
 
                   {/* Condition Issues */}
-                  <div className="bg-white/50 border border-white/50 rounded-xl overflow-hidden shadow-sm">
-                       <div className="px-6 py-4 bg-red-50/50 border-b border-white/40 flex items-center gap-2">
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                       <div className="px-6 py-4 bg-red-50 border-b border-red-100 flex items-center gap-2">
                           <XCircle className="w-5 h-5 text-red-600" />
                           <h4 className="font-bold text-gray-800">Defective / Condemned</h4>
                       </div>
                       <div className="max-h-64 overflow-y-auto">
                         <table className="w-full text-left">
-                            <tbody className="divide-y divide-gray-100/50">
+                            <tbody className="divide-y divide-gray-100">
                                 {reportData.unavailable.length > 0 ? reportData.unavailable.map(i => (
                                     <tr key={i.id}>
                                         <td className="px-6 py-3 text-sm text-gray-800">{i.name}</td>

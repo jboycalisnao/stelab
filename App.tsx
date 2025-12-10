@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
@@ -303,7 +301,7 @@ const App: React.FC = () => {
   // Loading State
   if (!settings) {
       return (
-          <div className="h-screen w-screen flex items-center justify-center bg-gray-50 text-gray-800">
+          <div className="h-screen w-screen flex items-center justify-center bg-gray-900 text-gray-200">
               <div className="flex flex-col items-center gap-4">
                   <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
                   <p>Loading System...</p>
@@ -344,27 +342,28 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen text-gray-800 bg-transparent">
-      <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col h-full shadow-sm z-20">
+      {/* Sidebar with increased opacity for contrast against dark background */}
+      <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col h-full shadow-xl z-20">
         <div className="p-6 border-b border-gray-100 flex-shrink-0">
            <AppBrand />
         </div>
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <button onClick={() => setView('dashboard')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+          <button onClick={() => setView('dashboard')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
             <LayoutDashboard className="w-5 h-5" /><span>Dashboard</span>
           </button>
-          <button onClick={() => setView('inventory')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'inventory' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+          <button onClick={() => setView('inventory')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'inventory' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
             <List className="w-5 h-5" /><span>Inventory List</span>
           </button>
-          <button onClick={() => setView('requests')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'requests' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+          <button onClick={() => setView('requests')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'requests' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
             <Inbox className="w-5 h-5" /><span>Requests</span>
           </button>
-          <button onClick={() => setView('scanner')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'scanner' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+          <button onClick={() => setView('scanner')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'scanner' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
             <ScanLine className="w-5 h-5" /><span>Scanner / ID</span>
           </button>
-          <button onClick={() => setView('lending')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'lending' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+          <button onClick={() => setView('lending')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'lending' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
             <HandPlatter className="w-5 h-5" /><span>Lending / Borrow</span>
           </button>
-          <button onClick={() => setView('settings')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+          <button onClick={() => setView('settings')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
             <SettingsIcon className="w-5 h-5" /><span>Settings</span>
           </button>
         </nav>
@@ -377,7 +376,7 @@ const App: React.FC = () => {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden relative z-10">
-        <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 p-4 md:hidden flex justify-between items-center flex-shrink-0 sticky top-0 z-30">
+        <header className="bg-white/95 backdrop-blur-md border-b border-gray-200 p-4 md:hidden flex justify-between items-center flex-shrink-0 sticky top-0 z-30 shadow-sm">
              <div className="flex items-center space-x-2">
                 {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded-md" /> : <div className="bg-blue-600 p-1.5 rounded-lg text-white"><FlaskConical className="w-5 h-5" /></div>}
                 <span className="font-bold truncate max-w-[150px] text-gray-800">{settings.appName}</span>
@@ -395,10 +394,11 @@ const App: React.FC = () => {
         </header>
 
         <div className="flex-1 overflow-y-auto">
-            <div className="bg-white/50 backdrop-blur-sm border-b border-gray-200/50 px-6 py-6 md:px-8 mb-6 sticky top-0 z-10">
+            {/* Main Content Header with distinct background */}
+            <div className="bg-white border-b border-gray-200 px-6 py-6 md:px-8 mb-6 sticky top-0 z-10 shadow-sm">
                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800">
+                    <h2 className="text-2xl font-bold text-gray-900">
                     {view === 'dashboard' && 'Laboratory Overview'}
                     {view === 'inventory' && 'Equipment Inventory'}
                     {view === 'requests' && 'Borrow Requests'}
@@ -406,7 +406,7 @@ const App: React.FC = () => {
                     {view === 'lending' && 'Borrowed Items'}
                     {view === 'settings' && 'System Configuration'}
                     </h2>
-                    <p className="text-gray-500 text-sm mt-1 font-medium">
+                    <p className="text-gray-600 text-sm mt-1 font-medium">
                         {isLoading ? 'Loading data...' : 'Manage your science assets efficiently.'}
                     </p>
                 </div>
@@ -421,7 +421,7 @@ const App: React.FC = () => {
             <div className="px-6 md:px-8 pb-8">
                 <div className="max-w-7xl mx-auto">
                     {isLoading && items.length === 0 ? (
-                        <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-blue-500"/></div>
+                        <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-white"/></div>
                     ) : (
                         <>
                             {view === 'dashboard' && !isMobile && <Dashboard items={items} />}

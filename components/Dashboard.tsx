@@ -37,14 +37,15 @@ const Dashboard: React.FC<DashboardProps> = ({ items }) => {
     return { totalItems, totalQuantity, borrowedQuantity, availableQuantity, lowStockItems, condemnedItems, valueByCategory, conditionBreakdown };
   }, [items]);
 
-  const CardGlass = "bg-white/70 backdrop-blur-xl border border-white/50 shadow-sm rounded-xl";
+  // Updated to be fully opaque or very slight transparency for contrast against dark background
+  const CardGlass = "bg-white rounded-xl border border-gray-200 shadow-lg";
 
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className={`${CardGlass} p-6 flex items-center space-x-4`}>
-          <div className="p-3 bg-blue-100/80 text-blue-600 rounded-full backdrop-blur-sm">
+          <div className="p-3 bg-blue-100 text-blue-600 rounded-full">
             <Box className="w-6 h-6" />
           </div>
           <div>
@@ -54,7 +55,7 @@ const Dashboard: React.FC<DashboardProps> = ({ items }) => {
         </div>
         
         <div className={`${CardGlass} p-6 flex items-center space-x-4`}>
-          <div className="p-3 bg-indigo-100/80 text-indigo-600 rounded-full backdrop-blur-sm">
+          <div className="p-3 bg-indigo-100 text-indigo-600 rounded-full">
             <HandPlatter className="w-6 h-6" />
           </div>
           <div>
@@ -64,7 +65,7 @@ const Dashboard: React.FC<DashboardProps> = ({ items }) => {
         </div>
 
         <div className={`${CardGlass} p-6 flex items-center space-x-4`}>
-          <div className="p-3 bg-amber-100/80 text-amber-600 rounded-full backdrop-blur-sm">
+          <div className="p-3 bg-maroon-100 text-maroon-600 rounded-full">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div>
@@ -74,7 +75,7 @@ const Dashboard: React.FC<DashboardProps> = ({ items }) => {
         </div>
 
         <div className={`${CardGlass} p-6 flex items-center space-x-4`}>
-          <div className="p-3 bg-green-100/80 text-green-600 rounded-full backdrop-blur-sm">
+          <div className="p-3 bg-green-100 text-green-600 rounded-full">
             <CheckCircle className="w-6 h-6" />
           </div>
           <div>
@@ -84,7 +85,7 @@ const Dashboard: React.FC<DashboardProps> = ({ items }) => {
         </div>
 
         <div className={`${CardGlass} p-6 flex items-center space-x-4`}>
-          <div className="p-3 bg-red-100/80 text-red-600 rounded-full backdrop-blur-sm">
+          <div className="p-3 bg-maroon-100 text-maroon-600 rounded-full">
             <AlertOctagon className="w-6 h-6" />
           </div>
           <div>
@@ -114,7 +115,7 @@ const Dashboard: React.FC<DashboardProps> = ({ items }) => {
                     <Cell key={`cell-${index}`} fill={getCategoryColor(entry.name)} />
                   ))}
                 </Pie>
-                <RechartsTooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                <RechartsTooltip contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -129,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ items }) => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                 <XAxis dataKey="name" tick={{fontSize: 12}} stroke="#6b7280" />
                 <YAxis stroke="#6b7280" />
-                <RechartsTooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                <RechartsTooltip contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                 <Bar dataKey="value" fill="#4b5563" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
