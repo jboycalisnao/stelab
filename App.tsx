@@ -195,6 +195,28 @@ const App: React.FC = () => {
       }
   };
 
+  const handleDeleteBorrowRecord = async (recordId: string) => {
+      if (window.confirm("Are you sure you want to delete this history record? If the item is currently 'Borrowed', this will cancel the loan and restore stock count.")) {
+          const result = await storage.deleteBorrowRecord(recordId);
+          if (result.success) {
+              await refreshData(true);
+          } else {
+              alert(result.message || "Failed to delete record.");
+          }
+      }
+  };
+
+  const handleBulkDeleteBorrowRecords = async (recordIds: string[]) => {
+       if (window.confirm(`Delete ${recordIds.length} records? This action cannot be undone.`)) {
+          const result = await storage.deleteBorrowRecords(recordIds);
+           if (result.success) {
+              await refreshData(true);
+          } else {
+              alert("Failed to delete records.");
+          }
+       }
+  };
+
   const handleSettingsSave = async (newSettings: AppSettings) => {
       await storage.saveSettings(newSettings);
       await refreshData(true);
@@ -373,6 +395,8 @@ const App: React.FC = () => {
                                     records={borrowRecords}
                                     onReturn={initiateReturn}
                                     onReturnBulk={handleBulkReturn}
+                                    onDelete={handleDeleteBorrowRecord}
+                                    onDeleteBulk={handleBulkDeleteBorrowRecords}
                                 />
                             )}
                             {view === 'settings' && !isMobile && (

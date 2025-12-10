@@ -195,6 +195,61 @@ export const returnItems = async (recordIds: string[]): Promise<{ success: boole
     }
 };
 
+export const deleteBorrowRecord = async (recordId: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+        // 1. Fetch record to check status
+        const { data: record, error: fetchError } = await supabase
+            .from('borrow_records')
+            .select('*')
+            .eq('id', recordId)
+            .single();
+        
+        if (fetchError || !record) throw new Error("Record not found");
+
+        // 2. If it is an ACTIVE loan ('Borrowed'), we must restore the borrowedQuantity in inventory
+        // effectively treating it as cancelled/undone to avoid "phantom" borrowed items.
+        if (record.status === 'Borrowed') {
+             const { data: item, error: itemError } = await supabase
+                .from('inventory_items')
+                .select('borrowedQuantity')
+                .eq('id', record.itemId)
+                .single();
+            
+            if (item) {
+                const newBorrowedQty = Math.max(0, item.borrowedQuantity - record.quantity);
+                const { error: updateError } = await supabase
+                    .from('inventory_items')
+                    .update({ borrowedQuantity: newBorrowedQty })
+                    .eq('id', record.itemId);
+                
+                if (updateError) throw updateError;
+            }
+        }
+
+        // 3. Delete the record
+        const { error: delError } = await supabase.from('borrow_records').delete().eq('id', recordId);
+        if (delError) throw delError;
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('Supabase Error (deleteBorrowRecord):', error.message);
+        return { success: false, message: error.message };
+    }
+};
+
+export const deleteBorrowRecords = async (recordIds: string[]): Promise<{ success: boolean; message?: string }> => {
+    try {
+        // Process sequentially to ensure logic per item holds
+        for (const id of recordIds) {
+            await deleteBorrowRecord(id);
+        }
+        return { success: true };
+    } catch (error: any) {
+        console.error('Supabase Error (deleteBorrowRecords):', error.message);
+        return { success: false, message: error.message };
+    }
+};
+
 // --- Settings ---
 
 export const getSettings = async (): Promise<AppSettings> => {
