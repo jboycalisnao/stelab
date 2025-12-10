@@ -1,7 +1,10 @@
 
+
 import React, { useState } from 'react';
-import { FlaskConical, Lock, User, AlertCircle, Eye, EyeOff, Mail, ArrowRight, ArrowLeft, KeyRound, Loader2, Send } from 'lucide-react';
-import { AppSettings } from '../types';
+import { FlaskConical, Lock, User, AlertCircle, Eye, EyeOff, Mail, ArrowRight, ArrowLeft, KeyRound, Loader2, Send, ShoppingBag, Search, QrCode } from 'lucide-react';
+import { AppSettings, BorrowRequest } from '../types';
+import * as storage from '../services/storageService';
+import PublicRequestModal from './PublicRequestModal';
 
 // Declare EmailJS global
 declare global {
@@ -18,10 +21,7 @@ interface LoginProps {
   expectedUsername?: string;
   expectedPassword?: string;
   recoveryEmail?: string;
-  
-  // EmailJS Settings passed from App.tsx (which gets them from storage/settings)
   settings?: AppSettings; 
-  
   onLogin: (status: boolean) => void;
   onPasswordReset?: (newPassword: string) => void;
 }
@@ -38,15 +38,23 @@ const Login: React.FC<LoginProps> = ({
     onLogin,
     onPasswordReset
 }) => {
+  // Mode: 'landing' | 'admin' | 'reset'
+  const [viewMode, setViewMode] = useState<'landing' | 'admin' | 'reset'>('landing');
+
   // Login State
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  // Request State
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [trackCode, setTrackCode] = useState('');
+  const [trackResult, setTrackResult] = useState<BorrowRequest | null | 'not_found'>(null);
+  const [isTrackLoading, setIsTrackLoading] = useState(false);
+
   // Forgot Password State
-  const [isResetMode, setIsResetMode] = useState(false);
-  const [resetStep, setResetStep] = useState<1 | 2 | 3>(1); // 1 = Email, 2 = OTP, 3 = New Pass
+  const [resetStep, setResetStep] = useState<1 | 2 | 3>(1);
   const [inputEmail, setInputEmail] = useState('');
   const [inputOtp, setInputOtp] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
@@ -70,19 +78,26 @@ const Login: React.FC<LoginProps> = ({
     }
   };
 
+  const handleTrackRequest = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!trackCode.trim()) return;
+      
+      setIsTrackLoading(true);
+      setTrackResult(null);
+      const res = await storage.getBorrowRequestByCode(trackCode.trim().toUpperCase());
+      setTrackResult(res || 'not_found');
+      setIsTrackLoading(false);
+  };
+
+  // --- Reset Password Logic (Same as before) ---
   const sendOtpEmail = async (email: string, otp: string) => {
       if (!window.emailjs || !settings?.emailJsServiceId || !settings?.emailJsTemplateId || !settings?.emailJsPublicKey) {
           throw new Error("Email service not configured. Please contact administrator to configure EmailJS in Settings.");
       }
-
       await window.emailjs.send(
           settings.emailJsServiceId,
           settings.emailJsTemplateId,
-          {
-              to_email: email,
-              otp: otp,
-              to_name: 'Admin User'
-          },
+          { to_email: email, otp: otp, to_name: 'Admin User' },
           settings.emailJsPublicKey
       );
   };
@@ -90,39 +105,16 @@ const Login: React.FC<LoginProps> = ({
   const handleResetStep1 = async (e: React.FormEvent) => {
       e.preventDefault();
       setResetError('');
-
-      // Check against stored recovery email
       const validEmail = recoveryEmail || 'admin@school.edu';
-
       if (inputEmail.trim().toLowerCase() === validEmail.toLowerCase()) {
-          // Generate OTP
           const otp = Math.floor(100000 + Math.random() * 900000).toString();
           setGeneratedOtp(otp);
           setIsSendingOtp(true);
-
           try {
-              // Try to send real email
               await sendOtpEmail(validEmail, otp);
               setResetStep(2);
           } catch (err: any) {
-              console.error("Email send failed", err);
-              
-              let msg = "Failed to send verification email. Check internet connection.";
-
-              // Handle specific EmailJS/Gmail errors
-              if (err.text && (typeof err.text === 'string')) {
-                  if (err.text.includes("Gmail_API") || err.text.includes("insufficient authentication scopes")) {
-                      msg = "Configuration Error: The EmailJS Gmail service has insufficient permissions. Please reconnect your Gmail account in the EmailJS dashboard.";
-                  } else if (err.status === 412) {
-                      msg = "Email Provider Error: Precondition failed (412). Please check your EmailJS service settings.";
-                  } else {
-                      msg = `Email Service Error: ${err.text}`;
-                  }
-              } else if (err.message) {
-                  msg = err.message;
-              }
-              
-              setResetError(msg);
+              setResetError(err.message || "Failed to send verification email.");
           } finally {
               setIsSendingOtp(false);
           }
@@ -134,319 +126,275 @@ const Login: React.FC<LoginProps> = ({
   const handleResetStep2 = (e: React.FormEvent) => {
       e.preventDefault();
       setResetError('');
-      
-      if (inputOtp === generatedOtp) {
-          setResetStep(3);
-      } else {
-          setResetError('Invalid verification code.');
-      }
+      if (inputOtp === generatedOtp) setResetStep(3);
+      else setResetError('Invalid verification code.');
   };
 
   const handleResetStep3 = (e: React.FormEvent) => {
       e.preventDefault();
       setResetError('');
-
-      if (newPassword.length < 4) {
-          setResetError('Password is too short.');
-          return;
-      }
-
-      if (newPassword !== confirmPassword) {
-          setResetError('Passwords do not match.');
-          return;
-      }
-
+      if (newPassword.length < 4) { setResetError('Password is too short.'); return; }
+      if (newPassword !== confirmPassword) { setResetError('Passwords do not match.'); return; }
       if (onPasswordReset) {
           onPasswordReset(newPassword);
-          setResetSuccess('Password updated successfully! Redirecting to login...');
+          setResetSuccess('Password updated successfully!');
           setTimeout(() => {
-              setIsResetMode(false);
+              setViewMode('admin');
               setResetStep(1);
               setResetSuccess('');
-              setInputEmail('');
-              setInputOtp('');
-              setGeneratedOtp('');
-              setNewPassword('');
-              setConfirmPassword('');
           }, 2000);
       }
   };
 
+  const getStatusColor = (status: string) => {
+      switch (status) {
+          case 'Approved': return 'text-green-600 bg-green-50 border-green-200';
+          case 'Pending': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+          case 'Rejected': return 'text-red-600 bg-red-50 border-red-200';
+          default: return 'text-gray-600 bg-gray-50';
+      }
+  };
+
   return (
-    <div 
-      className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-cover bg-center bg-no-repeat transition-all duration-500 relative"
-      style={{ backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : undefined }}
-    >
-      <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
+    <div className="min-h-screen flex flex-col justify-center items-center py-12 px-4 relative overflow-hidden">
+      
+      {/* Brand Header */}
+      <div className="relative z-10 mb-8 text-center animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex justify-center mb-4">
             {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="w-24 h-24 object-contain rounded-xl shadow-lg bg-white/90 p-2 backdrop-blur-sm" />
+                <img src={logoUrl} alt="Logo" className="w-24 h-24 object-contain rounded-xl shadow-md bg-white p-2 border border-gray-100" />
             ) : (
-                <div className="bg-blue-600/90 p-4 rounded-xl shadow-lg text-white backdrop-blur-sm">
+                <div className="bg-blue-600 p-4 rounded-xl shadow-md text-white">
                     <FlaskConical className="w-12 h-12" />
                 </div>
             )}
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-white drop-shadow-lg tracking-tight">
-          {appName}
-        </h2>
-        <p className="mt-2 text-center text-sm text-white/90 drop-shadow-md font-medium">
-          {isResetMode ? 'Account Recovery' : 'Sign in to manage your laboratory inventory'}
-        </p>
+        <h2 className="text-3xl font-extrabold text-gray-800 tracking-tight">{appName}</h2>
+        <p className="text-gray-500 mt-2 font-medium">Laboratory Equipment Inventory System</p>
       </div>
 
-      <div className="relative z-10 mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Liquid Glass Card */}
-        <div className="bg-white/10 backdrop-blur-xl py-8 px-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.36)] sm:rounded-2xl sm:px-10 border border-white/20">
-          
-          {!isResetMode ? (
-            // --- Standard Login Form ---
-            <form className="space-y-6" onSubmit={handleLogin}>
-                <div>
-                <label htmlFor="username" className="block text-sm font-medium text-white drop-shadow-md">
-                    Username
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-gray-700" />
-                    </div>
-                    <input
-                    id="username"
-                    name="username"
-                    type="text"
-                    required
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="block w-full pl-10 sm:text-sm border-white/30 rounded-lg py-2.5 bg-white/60 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-400 focus:border-transparent focus:bg-white/80 transition-all shadow-inner"
-                    placeholder="Enter your username"
-                    />
-                </div>
-                </div>
+      {/* Main Card */}
+      <div className="relative z-10 w-full max-w-4xl bg-white/80 backdrop-blur-xl border border-white/60 rounded-2xl shadow-xl overflow-hidden flex flex-col min-h-[500px]">
+        
+        {viewMode === 'landing' && (
+            <div className="flex-1 flex flex-col animate-in fade-in zoom-in duration-300">
+                {/* Main Content: Student Portal */}
+                <div className="flex-1 p-8 md:p-12 flex flex-col justify-center items-center relative group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-transparent opacity-50"></div>
+                    <div className="relative z-10 text-center space-y-8 w-full max-w-2xl">
+                        <div>
+                            <div className="bg-blue-100/50 p-5 rounded-full inline-flex mb-4">
+                                <ShoppingBag className="w-12 h-12 text-blue-600" />
+                            </div>
+                            <h3 className="text-3xl font-bold text-gray-800">Student / Guest Portal</h3>
+                            <p className="text-gray-500 mt-2 text-lg">Browse available equipment and submit borrow requests instantly.</p>
+                        </div>
 
-                <div>
-                <label htmlFor="password" className="block text-sm font-medium text-white drop-shadow-md">
-                    Password
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-gray-700" />
-                    </div>
-                    <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full pl-10 pr-10 sm:text-sm border-white/30 rounded-lg py-2.5 bg-white/60 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-400 focus:border-transparent focus:bg-white/80 transition-all shadow-inner"
-                    placeholder="Enter your password"
-                    />
-                    <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    onClick={() => setShowPassword(!showPassword)}
-                    >
-                    {showPassword ? (
-                        <EyeOff className="h-5 w-5 text-gray-500 hover:text-gray-700" />
-                    ) : (
-                        <Eye className="h-5 w-5 text-gray-500 hover:text-gray-700" />
-                    )}
-                    </button>
-                </div>
-                <div className="flex justify-end mt-1">
-                    <button 
-                        type="button" 
-                        onClick={() => setIsResetMode(true)}
-                        className="text-xs text-blue-200 hover:text-white font-medium drop-shadow-sm transition-colors"
-                    >
-                        Forgot Password?
-                    </button>
-                </div>
-                </div>
-
-                {error && (
-                <div className="rounded-lg bg-red-500/20 p-4 border border-red-500/50 backdrop-blur-sm">
-                    <div className="flex">
-                    <div className="flex-shrink-0">
-                        <AlertCircle className="h-5 w-5 text-red-100" />
-                    </div>
-                    <div className="ml-3">
-                        <h3 className="text-sm font-medium text-red-50 shadow-sm">{error}</h3>
-                    </div>
-                    </div>
-                </div>
-                )}
-
-                <div>
-                <button
-                    type="submit"
-                    className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-lg text-sm font-bold text-white bg-blue-600/90 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all backdrop-blur-sm hover:scale-[1.02]"
-                >
-                    Sign in
-                </button>
-                </div>
-            </form>
-          ) : (
-            // --- Reset Password Flow ---
-            <div className="space-y-6">
-                {resetStep === 1 && (
-                    <form onSubmit={handleResetStep1} className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                        <div className="text-center mb-4">
-                            <Mail className="mx-auto h-12 w-12 text-blue-200 opacity-80" />
-                            <h3 className="mt-2 text-lg font-bold text-white drop-shadow-md">Verify Recovery Email</h3>
-                            <p className="text-xs text-white/80 mt-1">We will send a verification code to your registered recovery email.</p>
+                        <div className="flex justify-center">
+                            <button 
+                                onClick={() => setShowRequestModal(true)}
+                                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all hover:scale-105 flex items-center gap-3 text-lg"
+                            >
+                                <ShoppingBag className="w-6 h-6" /> Start Request
+                            </button>
                         </div>
                         
+                        {/* Tracker Section */}
+                        <div className="mt-10 pt-8 border-t border-gray-100 w-full max-w-md mx-auto">
+                            <p className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-4">Already have a request?</p>
+                            <form onSubmit={handleTrackRequest} className="relative shadow-sm rounded-lg">
+                                <input 
+                                    type="text" 
+                                    value={trackCode}
+                                    onChange={(e) => setTrackCode(e.target.value)}
+                                    placeholder="Enter Reference Code (e.g. REQ-1234)" 
+                                    className="w-full pl-4 pr-12 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                />
+                                <button type="submit" className="absolute right-2 top-2 bottom-2 p-2 text-gray-400 hover:text-blue-600">
+                                    {isTrackLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : <Search className="w-5 h-5" />}
+                                </button>
+                            </form>
+                            
+                            {/* Track Result */}
+                            {trackResult && (
+                                <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+                                    {trackResult === 'not_found' ? (
+                                        <div className="p-3 bg-red-50 rounded-lg border border-red-100 text-red-600 text-sm flex items-center gap-2 justify-center font-medium">
+                                            <AlertCircle className="w-4 h-4"/> Request not found
+                                        </div>
+                                    ) : (
+                                        <div className={`p-4 rounded-lg border flex justify-between items-center bg-white shadow-sm`}>
+                                            <div className="text-left">
+                                                <div className="text-gray-900 font-bold">{trackResult.borrowerName}</div>
+                                                <div className="text-xs text-gray-500 mt-0.5">Ref: {trackResult.referenceCode}</div>
+                                            </div>
+                                            <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${getStatusColor(trackResult.status)}`}>
+                                                {trackResult.status}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer: Admin Access */}
+                <div className="py-4 border-t border-gray-100 bg-gray-50/50 flex justify-center">
+                    <button 
+                        onClick={() => setViewMode('admin')}
+                        className="text-gray-500 hover:text-blue-600 text-sm font-medium flex items-center gap-2 transition-colors px-4 py-2 rounded-lg hover:bg-gray-100"
+                    >
+                        <Lock className="w-3 h-3" /> Lab Admin Access
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {viewMode === 'admin' && (
+            <div className="w-full flex-1 p-8 sm:px-12 flex flex-col justify-center animate-in fade-in slide-in-from-right-8 duration-300 bg-white">
+                 <div className="w-full max-w-sm mx-auto">
+                    <button onClick={() => setViewMode('landing')} className="text-gray-400 hover:text-gray-600 flex items-center gap-2 text-sm transition-colors mb-8">
+                        <ArrowLeft className="w-4 h-4" /> Back to Portal
+                    </button>
+                    
+                    <h3 className="text-2xl font-bold text-gray-800 text-center mb-6">Admin Login</h3>
+                    
+                    <form className="space-y-5" onSubmit={handleLogin}>
                         <div>
-                            <label className="block text-sm font-medium text-white drop-shadow-md mb-1">Recovery Email</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Username</label>
+                            <div className="relative">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    required
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    className="block w-full pl-10 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                                    placeholder="Username"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Password</label>
+                            <div className="relative">
+                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="block w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                                    placeholder="Password"
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
+                            <div className="flex justify-end mt-1">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setViewMode('reset')}
+                                    className="text-xs text-blue-600 hover:text-blue-800 transition-colors font-medium"
+                                >
+                                    Forgot Password?
+                                </button>
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div className="p-3 bg-red-50 border border-red-100 rounded flex items-center gap-2 text-sm text-red-600">
+                                <AlertCircle className="w-4 h-4" /> {error}
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform active:scale-[0.99]"
+                        >
+                            Sign In
+                        </button>
+                    </form>
+                 </div>
+            </div>
+        )}
+
+        {viewMode === 'reset' && (
+            <div className="w-full flex-1 p-8 sm:px-12 flex flex-col justify-center animate-in fade-in slide-in-from-right-8 duration-300 bg-white">
+                <div className="w-full max-w-sm mx-auto">
+                    <button onClick={() => setViewMode('admin')} className="text-gray-400 hover:text-gray-600 flex items-center gap-2 text-sm transition-colors mb-6">
+                        <ArrowLeft className="w-4 h-4" /> Back to Login
+                    </button>
+
+                    <h3 className="text-2xl font-bold text-gray-800 text-center mb-2">Recovery</h3>
+                    
+                    {/* Reset steps logic embedded here for brevity, reuse state from previous implementation */}
+                    {resetStep === 1 && (
+                        <form onSubmit={handleResetStep1} className="space-y-6 mt-6">
+                            <p className="text-center text-gray-500 text-sm">Enter your recovery email to receive a code.</p>
                             <input
                                 type="email"
                                 required
                                 value={inputEmail}
                                 onChange={(e) => setInputEmail(e.target.value)}
-                                className="block w-full px-4 sm:text-sm border-white/30 rounded-lg py-2.5 bg-white/60 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-400"
-                                placeholder="e.g. admin@school.edu"
+                                className="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500"
+                                placeholder="admin@school.edu"
                             />
-                        </div>
-
-                        {resetError && (
-                            <div className="bg-red-500/30 p-3 rounded border border-red-500/40 flex gap-2 items-start">
-                                <AlertCircle className="w-5 h-5 text-red-200 flex-shrink-0 mt-0.5" />
-                                <p className="text-sm text-red-100">{resetError}</p>
-                            </div>
-                        )}
-
-                        <div className="flex gap-3">
-                            <button
-                                type="button"
-                                onClick={() => { setIsResetMode(false); setResetError(''); }}
-                                className="flex-1 py-2.5 border border-white/40 rounded-lg text-white hover:bg-white/10 text-sm font-medium transition-colors"
-                            >
-                                Cancel
+                            {resetError && <p className="text-red-500 text-sm">{resetError}</p>}
+                            <button type="submit" disabled={isSendingOtp} className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-bold flex justify-center items-center gap-2 shadow-md">
+                                {isSendingOtp && <Loader2 className="w-4 h-4 animate-spin"/>} Send Code
                             </button>
-                            <button
-                                type="submit"
-                                disabled={isSendingOtp}
-                                className="flex-1 flex justify-center items-center gap-2 py-2.5 bg-blue-600/90 hover:bg-blue-600 text-white rounded-lg shadow-lg text-sm font-bold transition-all disabled:opacity-70 disabled:cursor-wait"
-                            >
-                                {isSendingOtp ? <Loader2 className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4" />}
-                                <span>{isSendingOtp ? 'Sending...' : 'Send Code'}</span>
-                            </button>
-                        </div>
-                    </form>
-                )}
-                
-                {resetStep === 2 && (
-                    <form onSubmit={handleResetStep2} className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                         <div className="text-center mb-4">
-                            <KeyRound className="mx-auto h-12 w-12 text-blue-200 opacity-80" />
-                            <h3 className="mt-2 text-lg font-bold text-white drop-shadow-md">Enter Verification Code</h3>
-                            <p className="text-xs text-white/80 mt-1">Please enter the 6-digit code sent to <strong>{inputEmail}</strong>.</p>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-white drop-shadow-md mb-1">Verification Code</label>
+                        </form>
+                    )}
+                    
+                    {resetStep === 2 && (
+                        <form onSubmit={handleResetStep2} className="space-y-6 mt-6">
+                            <p className="text-center text-gray-500 text-sm">Enter the 6-digit code sent to you.</p>
                             <input
                                 type="text"
-                                required
-                                maxLength={6}
                                 value={inputOtp}
-                                onChange={(e) => setInputOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                                className="block w-full px-4 sm:text-sm border-white/30 rounded-lg py-2.5 bg-white/60 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-400 text-center text-xl tracking-widest font-mono"
-                                placeholder="000000"
+                                onChange={(e) => setInputOtp(e.target.value)}
+                                className="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-center text-xl tracking-widest font-mono focus:ring-2 focus:ring-blue-500"
                             />
-                        </div>
+                            {resetError && <p className="text-red-500 text-sm">{resetError}</p>}
+                            <button type="submit" className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-bold shadow-md">Verify</button>
+                        </form>
+                    )}
 
-                        {resetError && (
-                            <div className="bg-red-500/30 p-3 rounded border border-red-500/40 flex gap-2 items-start">
-                                <AlertCircle className="w-5 h-5 text-red-200 flex-shrink-0 mt-0.5" />
-                                <p className="text-sm text-red-100">{resetError}</p>
-                            </div>
-                        )}
-
-                        <div className="flex gap-3 mt-4">
-                             <button
-                                type="button"
-                                onClick={() => setResetStep(1)}
-                                className="flex-1 flex justify-center items-center gap-2 py-2.5 border border-white/40 rounded-lg text-white hover:bg-white/10 text-sm font-medium transition-colors"
-                            >
-                                <ArrowLeft className="w-4 h-4" /> Back
-                            </button>
-                             <button
-                                type="submit"
-                                className="flex-1 py-2.5 bg-blue-600/90 hover:bg-blue-600 text-white rounded-lg shadow-lg text-sm font-bold transition-all"
-                            >
-                                Verify
-                            </button>
-                        </div>
-                    </form>
-                )}
-
-                {resetStep === 3 && (
-                    <form onSubmit={handleResetStep3} className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                         {resetSuccess ? (
-                            <div className="text-center p-4 bg-green-500/30 border border-green-500/50 rounded-lg">
-                                <p className="text-white font-medium">{resetSuccess}</p>
-                            </div>
-                         ) : (
-                             <>
-                                <div className="text-center mb-4">
-                                    <Lock className="mx-auto h-10 w-10 text-blue-200 opacity-80" />
-                                    <h3 className="mt-2 text-lg font-bold text-white drop-shadow-md">Set New Password</h3>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-white drop-shadow-md mb-1">New Password</label>
-                                    <input
-                                        type="password"
-                                        required
-                                        value={newPassword}
-                                        onChange={(e) => setNewPassword(e.target.value)}
-                                        className="block w-full px-4 sm:text-sm border-white/30 rounded-lg py-2.5 bg-white/60 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-400"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-white drop-shadow-md mb-1">Confirm Password</label>
-                                    <input
-                                        type="password"
-                                        required
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className="block w-full px-4 sm:text-sm border-white/30 rounded-lg py-2.5 bg-white/60 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-400"
-                                    />
-                                </div>
-
-                                {resetError && (
-                                    <div className="bg-red-500/30 p-3 rounded border border-red-500/40 flex gap-2 items-start">
-                                        <AlertCircle className="w-5 h-5 text-red-200 flex-shrink-0 mt-0.5" />
-                                        <p className="text-sm text-red-100">{resetError}</p>
-                                    </div>
-                                )}
-
-                                <div className="flex gap-3 mt-4">
-                                    <button
-                                        type="submit"
-                                        className="w-full py-2.5 bg-green-600/90 hover:bg-green-600 text-white rounded-lg shadow-lg text-sm font-bold transition-all"
-                                    >
-                                        Update Password
-                                    </button>
-                                </div>
-                             </>
-                         )}
-                    </form>
-                )}
+                    {resetStep === 3 && (
+                        <form onSubmit={handleResetStep3} className="space-y-6 mt-6">
+                            {resetSuccess ? (
+                                <div className="text-green-600 text-center font-bold">{resetSuccess}</div>
+                            ) : (
+                                <>
+                                    <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New Password" className="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 mb-4 focus:ring-2 focus:ring-blue-500" />
+                                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm Password" className="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500" />
+                                    {resetError && <p className="text-red-500 text-sm">{resetError}</p>}
+                                    <button type="submit" className="w-full py-2.5 bg-green-600 text-white rounded-lg font-bold shadow-md">Update Password</button>
+                                </>
+                            )}
+                        </form>
+                    )}
+                 </div>
             </div>
-          )}
-        </div>
+        )}
+
       </div>
       
       {customFooterText && (
-        <div className="absolute bottom-4 left-0 right-0 text-center z-10 px-4">
-            <p className="text-white/60 text-xs font-medium tracking-wide drop-shadow-sm uppercase">
+        <div className="absolute bottom-4 left-0 right-0 text-center z-0 px-4">
+            <p className="text-gray-400 text-xs font-medium tracking-wide uppercase">
                 {customFooterText}
             </p>
         </div>
       )}
+
+      {showRequestModal && <PublicRequestModal onClose={() => setShowRequestModal(false)} />}
     </div>
   );
 };

@@ -1,6 +1,6 @@
 
 
-import { InventoryItem, BorrowRecord, AppSettings, Category, ItemCondition, AuditLog } from '../types';
+import { InventoryItem, BorrowRecord, AppSettings, Category, ItemCondition, AuditLog, BorrowRequest, RequestStatus } from '../types';
 import { supabase } from '../supabaseClient';
 import { DEFAULT_CATEGORIES } from '../constants';
 
@@ -246,6 +246,109 @@ export const deleteBorrowRecords = async (recordIds: string[]): Promise<{ succes
         return { success: true };
     } catch (error: any) {
         console.error('Supabase Error (deleteBorrowRecords):', error.message);
+        return { success: false, message: error.message };
+    }
+};
+
+// --- Borrow Requests (Public/Admin) ---
+
+export const createBorrowRequest = async (request: Omit<BorrowRequest, 'id' | 'status'>): Promise<BorrowRequest | null> => {
+    try {
+        const newRequest = {
+            ...request,
+            id: crypto.randomUUID(),
+            status: 'Pending',
+        };
+        const { error } = await supabase.from('borrow_requests').insert(newRequest);
+        if (error) throw error;
+        return newRequest as BorrowRequest;
+    } catch (error: any) {
+        console.error('Supabase Error (createBorrowRequest):', error.message);
+        return null;
+    }
+};
+
+export const getBorrowRequests = async (): Promise<BorrowRequest[]> => {
+    try {
+        const { data, error } = await supabase.from('borrow_requests').select('*');
+        if (error) throw error;
+        // Parse items JSON if supabase returns string, though the JS client usually handles JSONB
+        return data as BorrowRequest[];
+    } catch (error: any) {
+        console.error('Supabase Error (getBorrowRequests):', error.message);
+        return [];
+    }
+};
+
+export const getBorrowRequestByCode = async (code: string): Promise<BorrowRequest | null> => {
+    try {
+        const { data, error } = await supabase.from('borrow_requests').select('*').eq('referenceCode', code).single();
+        if (error) throw error;
+        return data as BorrowRequest;
+    } catch (error: any) {
+        console.error('Supabase Error (getBorrowRequestByCode):', error.message);
+        return null;
+    }
+};
+
+export const updateBorrowRequestStatus = async (id: string, status: RequestStatus, notes?: string): Promise<boolean> => {
+    try {
+        const updateData: any = { status };
+        if (notes !== undefined) updateData.adminNotes = notes;
+        
+        const { error } = await supabase.from('borrow_requests').update(updateData).eq('id', id);
+        if (error) throw error;
+        return true;
+    } catch (error: any) {
+        console.error('Supabase Error (updateBorrowRequestStatus):', error.message);
+        return false;
+    }
+};
+
+export const deleteBorrowRequest = async (id: string): Promise<boolean> => {
+    try {
+        const { error } = await supabase.from('borrow_requests').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+    } catch (error: any) {
+        console.error('Supabase Error (deleteBorrowRequest):', error.message);
+        return false;
+    }
+};
+
+export const processApprovedRequest = async (request: BorrowRequest): Promise<{ success: boolean; message?: string }> => {
+    // This converts a request into actual Borrow Records and updates inventory
+    try {
+        // 1. Verify items are still available
+        for (const reqItem of request.items) {
+             const { data: invItem } = await supabase.from('inventory_items').select('*').eq('id', reqItem.itemId).single();
+             if (!invItem) throw new Error(`Item ${reqItem.itemName} not found.`);
+             const available = invItem.quantity - (invItem.borrowedQuantity || 0);
+             if (available < reqItem.quantity) {
+                 throw new Error(`Insufficient stock for ${reqItem.itemName}. Available: ${available}, Requested: ${reqItem.quantity}`);
+             }
+        }
+
+        // 2. Process each item (Call borrowItem transaction for each)
+        // We do this sequentially to ensure safety
+        for (const reqItem of request.items) {
+            const result = await borrowItem(
+                reqItem.itemId,
+                request.borrowerName,
+                request.borrowerId,
+                reqItem.quantity,
+                request.returnDate
+            );
+            if (!result.success) throw new Error(`Failed to process ${reqItem.itemName}: ${result.message}`);
+        }
+
+        // 3. Update Request Status
+        await updateBorrowRequestStatus(request.id, 'Approved');
+
+        return { success: true };
+
+    } catch (error: any) {
+        console.error('Supabase Error (processApprovedRequest):', error.message);
         return { success: false, message: error.message };
     }
 };

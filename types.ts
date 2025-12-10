@@ -103,3 +103,25 @@ export interface AuditLog {
   };
   details: AuditDetail[];
 }
+
+// --- Borrow Request Types ---
+
+export type RequestStatus = 'Pending' | 'Approved' | 'Rejected' | 'Completed' | 'Cancelled';
+
+export interface RequestItem {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+}
+
+export interface BorrowRequest {
+  id: string;
+  referenceCode: string;
+  borrowerName: string;
+  borrowerId: string;
+  requestDate: string;
+  returnDate: string;
+  status: RequestStatus;
+  items: RequestItem[];
+  adminNotes?: string;
+}
