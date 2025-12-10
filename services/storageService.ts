@@ -71,8 +71,9 @@ export const borrowItem = async (
     quantity: number, 
     dueDate: string, 
     specificId?: string
-): Promise<{ success: boolean; message?: string }> => {
+): Promise<{ success: boolean; message?: string; recordId?: string }> => {
     try {
+        const recordId = crypto.randomUUID();
         // We use a stored procedure (RPC) to handle the transaction (check stock -> update stock -> create record) atomically
         // Using v3 to handle potential text/uuid type mismatches in Postgres safely
         const { data, error } = await supabase.rpc('borrow_item_transaction_v3', {
@@ -82,7 +83,7 @@ export const borrowItem = async (
             p_quantity: quantity,
             p_due_date: dueDate,
             p_specific_id: specificId || null,
-            p_record_id: crypto.randomUUID(),
+            p_record_id: recordId,
             p_borrow_date: new Date().toISOString().split('T')[0]
         });
 
@@ -90,7 +91,7 @@ export const borrowItem = async (
         
         // Supabase RPC returns JSON, check success property
         if (data && data.success) {
-            return { success: true };
+            return { success: true, recordId: recordId };
         } else {
             return { success: false, message: data?.message || "Transaction failed" };
         }
@@ -98,6 +99,58 @@ export const borrowItem = async (
     } catch (error: any) {
         console.error('Supabase Error (borrowItem):', error.message);
         return { success: false, message: error.message };
+    }
+};
+
+const updateRequestStatusByLinkedRecord = async (recordId: string) => {
+    // Check if this record belongs to a Request. If so, check if all items in that request are returned.
+    try {
+        // 1. Find the request containing this recordId
+        // Since we store items as JSON, we need to search within the JSON array
+        const { data: requests } = await supabase
+            .from('borrow_requests')
+            .select('*')
+            .contains('items', JSON.stringify([{ linkedRecordId: recordId }])); // Simple containment check might not work perfectly for complex JSONB arrays depending on structure, so we might need a broader scan or better query.
+            
+        // Better approach: fetch requests where status is Approved or Released
+        // and scan their items in JS since we can't easily perform "contains item with linkedRecordId=X" in standard PostgREST without specific JSON operators.
+        // Given volume is likely low, we can fetch 'Active' requests.
+        
+        const { data: activeRequests } = await supabase
+            .from('borrow_requests')
+            .select('*')
+            .in('status', ['Approved', 'Released']);
+
+        if (!activeRequests || activeRequests.length === 0) return;
+
+        for (const req of activeRequests) {
+            const hasRecord = req.items.some((item: any) => item.linkedRecordId === recordId);
+            if (hasRecord) {
+                // This is the request. Now check if ALL linked records are returned.
+                const allLinkedIds = req.items.map((item: any) => item.linkedRecordId).filter((id: any) => !!id);
+                
+                if (allLinkedIds.length > 0) {
+                    const { data: records } = await supabase
+                        .from('borrow_records')
+                        .select('status')
+                        .in('id', allLinkedIds);
+                    
+                    if (records) {
+                        const allReturned = records.every((r: any) => r.status === 'Returned');
+                        if (allReturned) {
+                             await supabase
+                                .from('borrow_requests')
+                                .update({ status: 'Completed' })
+                                .eq('id', req.id);
+                        }
+                    }
+                }
+                break; // Found the request
+            }
+        }
+
+    } catch (e) {
+        console.error("Failed to sync request status", e);
     }
 };
 
@@ -173,6 +226,9 @@ export const returnItem = async (
             .eq('id', recordId);
 
         if (updateRecError) throw updateRecError;
+
+        // C. Sync Request Status (Fire and forget, don't block return)
+        updateRequestStatusByLinkedRecord(recordId);
 
         return { success: true };
 
@@ -308,6 +364,23 @@ export const updateBorrowRequestStatus = async (id: string, status: RequestStatu
 
 export const deleteBorrowRequest = async (id: string): Promise<boolean> => {
     try {
+        // 1. Fetch the request to check for linked borrow records
+        const { data: req, error: fetchError } = await supabase.from('borrow_requests').select('*').eq('id', id).single();
+        if (fetchError || !req) throw new Error("Request not found");
+
+        const request = req as BorrowRequest;
+        
+        // 2. Collect linked record IDs
+        const linkedIds = request.items
+            .map(item => item.linkedRecordId)
+            .filter((id): id is string => !!id);
+
+        // 3. Delete associated borrow records (this handles inventory restoration if they are active)
+        if (linkedIds.length > 0) {
+            await deleteBorrowRecords(linkedIds);
+        }
+
+        // 4. Delete the request itself
         const { error } = await supabase.from('borrow_requests').delete().eq('id', id);
         if (error) throw error;
         return true;
@@ -331,8 +404,11 @@ export const processApprovedRequest = async (request: BorrowRequest): Promise<{ 
         }
 
         // 2. Process each item (Call borrowItem transaction for each)
-        // We do this sequentially to ensure safety
-        for (const reqItem of request.items) {
+        // We do this sequentially to ensure safety and capture IDs
+        const updatedItems = [...request.items];
+
+        for (let i = 0; i < updatedItems.length; i++) {
+            const reqItem = updatedItems[i];
             const result = await borrowItem(
                 reqItem.itemId,
                 request.borrowerName,
@@ -340,11 +416,23 @@ export const processApprovedRequest = async (request: BorrowRequest): Promise<{ 
                 reqItem.quantity,
                 request.returnDate
             );
+            
             if (!result.success) throw new Error(`Failed to process ${reqItem.itemName}: ${result.message}`);
+            
+            // Link the created record ID to the request item
+            if (result.recordId) {
+                updatedItems[i] = { ...reqItem, linkedRecordId: result.recordId };
+            }
         }
 
-        // 3. Update Request Status
-        await updateBorrowRequestStatus(request.id, 'Approved');
+        // 3. Update Request Status AND update the items with linked IDs
+        // This effectively saves the "link" between request and borrow records
+        const { error } = await supabase.from('borrow_requests').update({ 
+            status: 'Approved',
+            items: updatedItems // Save updated JSON with linkedRecordIds
+        }).eq('id', request.id);
+
+        if (error) throw error;
 
         return { success: true };
 

@@ -1,6 +1,6 @@
 
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FlaskConical, Lock, User, AlertCircle, Eye, EyeOff, Mail, ArrowRight, ArrowLeft, KeyRound, Loader2, Send, ShoppingBag, Search, QrCode } from 'lucide-react';
 import { AppSettings, BorrowRequest } from '../types';
 import * as storage from '../services/storageService';
@@ -64,6 +64,17 @@ const Login: React.FC<LoginProps> = ({
   const [resetSuccess, setResetSuccess] = useState('');
   const [isSendingOtp, setIsSendingOtp] = useState(false);
 
+  // Check URL for reference code on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) {
+        setTrackCode(ref);
+        // Automatically trigger search
+        handleTrackRequest(undefined, ref);
+    }
+  }, []);
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -78,13 +89,15 @@ const Login: React.FC<LoginProps> = ({
     }
   };
 
-  const handleTrackRequest = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!trackCode.trim()) return;
+  const handleTrackRequest = async (e?: React.FormEvent, codeOverride?: string) => {
+      if (e) e.preventDefault();
+      const code = codeOverride || trackCode;
+      
+      if (!code.trim()) return;
       
       setIsTrackLoading(true);
       setTrackResult(null);
-      const res = await storage.getBorrowRequestByCode(trackCode.trim().toUpperCase());
+      const res = await storage.getBorrowRequestByCode(code.trim().toUpperCase());
       setTrackResult(res || 'not_found');
       setIsTrackLoading(false);
   };
@@ -151,6 +164,8 @@ const Login: React.FC<LoginProps> = ({
           case 'Approved': return 'text-green-600 bg-green-50 border-green-200';
           case 'Pending': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
           case 'Rejected': return 'text-red-600 bg-red-50 border-red-200';
+          case 'Completed': return 'text-blue-600 bg-blue-50 border-blue-200';
+          case 'Released': return 'text-indigo-600 bg-indigo-50 border-indigo-200';
           default: return 'text-gray-600 bg-gray-50';
       }
   };
@@ -202,7 +217,7 @@ const Login: React.FC<LoginProps> = ({
                         {/* Tracker Section */}
                         <div className="mt-10 pt-8 border-t border-gray-100 w-full max-w-md mx-auto">
                             <p className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-4">Already have a request?</p>
-                            <form onSubmit={handleTrackRequest} className="relative shadow-sm rounded-lg">
+                            <form onSubmit={(e) => handleTrackRequest(e)} className="relative shadow-sm rounded-lg">
                                 <input 
                                     type="text" 
                                     value={trackCode}
@@ -229,7 +244,7 @@ const Login: React.FC<LoginProps> = ({
                                                 <div className="text-xs text-gray-500 mt-0.5">Ref: {trackResult.referenceCode}</div>
                                             </div>
                                             <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${getStatusColor(trackResult.status)}`}>
-                                                {trackResult.status}
+                                                {trackResult.status === 'Released' ? 'Released (Active)' : trackResult.status === 'Completed' ? 'Returned' : trackResult.status}
                                             </div>
                                         </div>
                                     )}

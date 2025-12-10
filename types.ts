@@ -110,6 +110,7 @@ export interface RequestItem {
   itemId: string;
   itemName: string;
   quantity: number;
+  linkedRecordId?: string; // ID of the actual borrow record created from this item
 }
 
 export interface BorrowRequest {

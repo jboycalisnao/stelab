@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BorrowRequest, RequestStatus } from '../types';
 import * as storage from '../services/storageService';
-import { Search, CheckCircle, XCircle, Trash2, Printer, Eye, Clock, FileText, Loader2 } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Trash2, Printer, Eye, Clock, FileText, Loader2, Send } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 
 interface RequestsListProps {
@@ -14,7 +14,7 @@ const RequestsList: React.FC<RequestsListProps> = () => {
   const [requests, setRequests] = useState<BorrowRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<RequestStatus | 'All'>('All');
+  const [statusFilter, setStatusFilter] = useState<RequestStatus | 'All' | 'Released'>('All');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   // Modal State
@@ -85,6 +85,22 @@ const RequestsList: React.FC<RequestsListProps> = () => {
       );
   };
 
+  const handleRelease = async (request: BorrowRequest) => {
+      confirmAction(
+        "Release Items",
+        `Mark items for ${request.referenceCode} as Released? This confirms the borrower has physically taken the items.`,
+        async () => {
+             setProcessingId(request.id);
+             // We use a custom status 'Released' which isn't in the strict enum initially but we can cast or handle it
+             // Actually, let's update status to 'Released' (we need to ensure types allow it or just use string)
+             await storage.updateBorrowRequestStatus(request.id, 'Released' as RequestStatus);
+             await loadRequests();
+             setProcessingId(null);
+        },
+        false
+      );
+  };
+
   const handleReject = async (id: string) => {
       confirmAction(
         "Reject Request",
@@ -100,7 +116,7 @@ const RequestsList: React.FC<RequestsListProps> = () => {
   const handleDelete = async (id: string) => {
       confirmAction(
         "Delete Request Record",
-        "Permanently delete this request record? This cannot be undone.",
+        "Permanently delete this request record? If this request was approved/released, the associated borrow records will also be deleted from the system and inventory restored.",
         async () => {
              await storage.deleteBorrowRequest(id);
              await loadRequests();
@@ -110,7 +126,9 @@ const RequestsList: React.FC<RequestsListProps> = () => {
   };
 
   const handlePrintSlip = (req: BorrowRequest) => {
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(req.referenceCode)}`;
+      // Directs to the current app status page
+      const trackingUrl = `${window.location.origin}?ref=${req.referenceCode}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(trackingUrl)}`;
       
       const printWindow = window.open('', '', 'height=600,width=800');
       if (printWindow) {
@@ -118,71 +136,70 @@ const RequestsList: React.FC<RequestsListProps> = () => {
           printWindow.document.write(`
             <style>
                 @media print {
-                    @page { size: A4 portrait; margin: 0; }
-                    body { margin: 0; padding: 0; }
+                    @page { size: A5 landscape; margin: 0; }
+                    body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
                 }
-                body { font-family: 'Segoe UI', sans-serif; color: #1f2937; }
-                .page-container {
-                    width: 100%;
-                    height: 100vh;
-                }
+                body { font-family: 'Segoe UI', sans-serif; color: #1f2937; background: white; }
                 .slip-container { 
-                    width: 100%;
-                    height: 148mm; /* Half of A4 height (297mm) */
-                    border-bottom: 1px dashed #ccc; 
-                    padding: 30px 40px; 
+                    width: 210mm; /* A5 Landscape Width */
+                    height: 148mm; /* A5 Landscape Height */
+                    padding: 20px 30px; 
                     box-sizing: border-box;
-                    position: relative;
+                    display: flex;
+                    flex-direction: column;
                 }
-                .header { border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
-                .header h1 { margin: 0; font-size: 1.6em; color: #1e3a8a; }
+                .header { border-bottom: 2px solid #2563eb; padding-bottom: 8px; margin-bottom: 15px; text-align: center; }
+                .header h1 { margin: 0; font-size: 1.4em; color: #1e3a8a; }
                 .header p { margin: 2px 0 0; color: #6b7280; font-size: 0.8em; text-transform: uppercase; letter-spacing: 1.5px; }
                 
-                .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; font-size: 0.9em; }
-                .meta-item label { display: block; font-weight: bold; color: #4b5563; font-size: 0.7em; text-transform: uppercase; margin-bottom: 2px; }
-                .meta-item div { font-weight: 500; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 3px; font-size: 1em; }
+                .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; font-size: 0.85em; }
+                .meta-item label { display: block; font-weight: bold; color: #4b5563; font-size: 0.7em; text-transform: uppercase; margin-bottom: 1px; }
+                .meta-item div { font-weight: 500; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px; }
 
-                table { width: 100%; border-collapse: collapse; font-size: 0.85em; margin-bottom: 10px; }
-                th { background: #f3f4f6; text-align: left; padding: 8px; border-bottom: 2px solid #e5e7eb; text-transform: uppercase; font-size: 0.75em; color: #4b5563; }
-                td { padding: 8px; border-bottom: 1px solid #e5e7eb; }
+                .items-table-container { flex: 1; min-height: 50px; }
+                table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
+                th { background: #f3f4f6; text-align: left; padding: 6px; border-bottom: 2px solid #e5e7eb; text-transform: uppercase; font-size: 0.75em; color: #4b5563; }
+                td { padding: 6px; border-bottom: 1px solid #e5e7eb; }
                 
-                .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; position: relative; }
+                .footer-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 10px; }
                 
-                .qr-section { position: absolute; bottom: 20px; right: 20px; text-align: center; }
-                .qr-section img { width: 90px; height: 90px; }
-                .qr-section .code { font-family: monospace; font-weight: bold; font-size: 1em; margin-top: 5px; color: #1f2937; }
-
-                .signature-box { margin-top: 10px; }
-                .signature-line { width: 100%; border-top: 1px solid #000; margin-top: 35px; padding-top: 5px; font-size: 0.75em; text-align: center; text-transform: uppercase; color: #4b5563; }
+                .signatures { display: flex; gap: 30px; flex: 1; }
+                .signature-box { flex: 1; }
+                .signature-line { width: 100%; border-top: 1px solid #000; margin-top: 35px; padding-top: 5px; font-size: 0.7em; text-align: center; text-transform: uppercase; color: #4b5563; }
+                
+                .qr-section { width: 100px; text-align: center; margin-left: 20px; flex-shrink: 0; }
+                .qr-section img { width: 80px; height: 80px; }
+                .qr-section .code { font-family: monospace; font-weight: bold; font-size: 0.9em; margin-top: 2px; color: #1f2937; }
+                .qr-scan-hint { font-size: 0.6em; color: #6b7280; margin-top: 2px; }
             </style>
           `);
           printWindow.document.write('</head><body>');
           printWindow.document.write(`
-            <div class="page-container">
-                <div class="slip-container">
-                    <div class="header">
-                        <h1>Equipment Borrow Slip</h1>
-                        <p>Laboratory Inventory System</p>
-                    </div>
+            <div class="slip-container">
+                <div class="header">
+                    <h1>Equipment Borrow Slip</h1>
+                    <p>Laboratory Inventory System</p>
+                </div>
 
-                    <div class="meta-grid">
-                        <div class="meta-item"><label>Reference Code</label><div>${req.referenceCode}</div></div>
-                        <div class="meta-item"><label>Date Requested</label><div>${new Date(req.requestDate).toLocaleDateString()}</div></div>
-                        <div class="meta-item"><label>Borrower Name</label><div>${req.borrowerName}</div></div>
-                        <div class="meta-item"><label>ID / Section</label><div>${req.borrowerId}</div></div>
-                        <div class="meta-item"><label>Expected Return</label><div>${req.returnDate}</div></div>
-                    </div>
+                <div class="meta-grid">
+                    <div class="meta-item"><label>Reference Code</label><div>${req.referenceCode}</div></div>
+                    <div class="meta-item"><label>Date Requested</label><div>${new Date(req.requestDate).toLocaleDateString()}</div></div>
+                    <div class="meta-item"><label>Borrower Name</label><div>${req.borrowerName}</div></div>
+                    <div class="meta-item"><label>ID / Section</label><div>${req.borrowerId}</div></div>
+                    <div class="meta-item"><label>Expected Return</label><div>${req.returnDate}</div></div>
+                </div>
 
-                    <div style="min-height: 150px;">
-                        <table>
-                            <thead><tr><th>Item Name</th><th style="text-align:right">Qty</th></tr></thead>
-                            <tbody>
-                                ${req.items.map(i => `<tr><td>${i.itemName}</td><td style="text-align:right">${i.quantity}</td></tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="items-table-container">
+                    <table>
+                        <thead><tr><th>Item Name</th><th style="text-align:right">Qty</th></tr></thead>
+                        <tbody>
+                            ${req.items.map(i => `<tr><td>${i.itemName}</td><td style="text-align:right">${i.quantity}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
 
-                    <div class="footer-grid">
+                <div class="footer-row">
+                    <div class="signatures">
                         <div class="signature-box">
                             <div class="signature-line">Borrower Signature</div>
                         </div>
@@ -190,10 +207,10 @@ const RequestsList: React.FC<RequestsListProps> = () => {
                             <div class="signature-line">Lab Admin Approval</div>
                         </div>
                     </div>
-
                     <div class="qr-section">
                         <img src="${qrUrl}" />
                         <div class="code">${req.referenceCode}</div>
+                        <div class="qr-scan-hint">Scan to Track</div>
                     </div>
                 </div>
             </div>
@@ -204,12 +221,13 @@ const RequestsList: React.FC<RequestsListProps> = () => {
       }
   };
 
-  const getStatusBadge = (status: RequestStatus) => {
+  const getStatusBadge = (status: RequestStatus | string) => {
       switch (status) {
           case 'Approved': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Approved</span>;
           case 'Pending': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">Pending</span>;
           case 'Rejected': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">Rejected</span>;
-          case 'Completed': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">Completed</span>;
+          case 'Completed': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">Completed (Returned)</span>;
+          case 'Released': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">Released</span>;
           default: return <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">{status}</span>;
       }
   };
@@ -230,7 +248,7 @@ const RequestsList: React.FC<RequestsListProps> = () => {
             </div>
             
             <div className="flex bg-white/40 rounded-lg p-1 border border-white/40">
-                {(['All', 'Pending', 'Approved', 'Rejected'] as const).map(status => (
+                {(['All', 'Pending', 'Approved', 'Released'] as const).map(status => (
                     <button 
                         key={status}
                         onClick={() => setStatusFilter(status)}
@@ -298,6 +316,17 @@ const RequestsList: React.FC<RequestsListProps> = () => {
                                                 Reject
                                             </button>
                                         </>
+                                    )}
+
+                                    {req.status === 'Approved' && (
+                                        <button 
+                                            onClick={() => handleRelease(req)}
+                                            disabled={processingId === req.id}
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm text-sm font-bold disabled:opacity-50"
+                                        >
+                                            <Send className="w-3 h-3" />
+                                            Release
+                                        </button>
                                     )}
                                     
                                     <button 
