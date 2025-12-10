@@ -16,6 +16,7 @@ import Settings from './components/Settings';
 import Login from './components/Login';
 import Scanner from './components/Scanner';
 import RequestsList from './components/RequestsList';
+import ConfirmModal from './components/ConfirmModal';
 import { LayoutDashboard, List, Plus, FlaskConical, HandPlatter, Settings as SettingsIcon, LogOut, ScanLine, Loader2, Inbox } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -42,6 +43,21 @@ const App: React.FC = () => {
 
   // Return Modal State
   const [returnModalState, setReturnModalState] = useState<{ isOpen: boolean; record?: BorrowRecord; item?: InventoryItem }>({ isOpen: false });
+
+  // Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    isDestructive: false
+  });
 
   const refreshData = React.useCallback(async (silent = false) => {
       if (!silent) setIsLoading(true);
@@ -133,19 +149,36 @@ const App: React.FC = () => {
       setView('dashboard');
   };
 
+  const confirmAction = (title: string, message: string, action: () => void, isDestructive = false) => {
+    setConfirmModal({
+        isOpen: true,
+        title,
+        message,
+        onConfirm: () => {
+            action();
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        },
+        isDestructive
+    });
+  };
+
   const handleSave = async (item: InventoryItem) => {
     await storage.saveItem(item);
-    // Refresh handled by subscription, but manual refresh ensures immediate local feedback if sub is slow
     await refreshData(true);
     setIsFormOpen(false);
     setEditingItem(undefined);
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this item?")) {
-      await storage.deleteItem(id);
-      await refreshData(true);
-    }
+    confirmAction(
+        "Delete Equipment", 
+        "Are you sure you want to permanently delete this item from inventory? This action cannot be undone.", 
+        async () => {
+            await storage.deleteItem(id);
+            await refreshData(true);
+        },
+        true
+    );
   };
 
   const handleBorrowConfirm = async (
@@ -156,6 +189,7 @@ const App: React.FC = () => {
       dueDate: string, 
       specificId?: string
   ) => {
+    // Borrow Modal handles its own data entry, no extra confirm needed as it is a modal itself.
     const result = await storage.borrowItem(item.id, borrowerName, borrowerId, quantity, dueDate, specificId);
     if (result.success) {
         await refreshData(true);
@@ -187,36 +221,50 @@ const App: React.FC = () => {
   };
 
   const handleBulkReturn = async (recordIds: string[]) => {
-      if (window.confirm(`Confirm return of ${recordIds.length} selected items? (Assumes all items are returned in good condition)`)) {
-          const result = await storage.returnItems(recordIds);
-          if (result.success) {
-              await refreshData(true);
-          } else {
-              alert("Failed to return items.");
-          }
-      }
+      confirmAction(
+        "Bulk Return",
+        `Confirm return of ${recordIds.length} selected items? (Assumes all items are returned in good condition)`,
+        async () => {
+            const result = await storage.returnItems(recordIds);
+            if (result.success) {
+                await refreshData(true);
+            } else {
+                alert("Failed to return items.");
+            }
+        }
+      );
   };
 
   const handleDeleteBorrowRecord = async (recordId: string) => {
-      if (window.confirm("Are you sure you want to delete this history record? If the item is currently 'Borrowed', this will cancel the loan and restore stock count.")) {
-          const result = await storage.deleteBorrowRecord(recordId);
-          if (result.success) {
-              await refreshData(true);
-          } else {
-              alert(result.message || "Failed to delete record.");
-          }
-      }
+      confirmAction(
+        "Delete History Record",
+        "Are you sure you want to delete this history record? If the item is currently 'Borrowed', this will cancel the loan and restore stock count.",
+        async () => {
+            const result = await storage.deleteBorrowRecord(recordId);
+            if (result.success) {
+                await refreshData(true);
+            } else {
+                alert(result.message || "Failed to delete record.");
+            }
+        },
+        true
+      );
   };
 
   const handleBulkDeleteBorrowRecords = async (recordIds: string[]) => {
-       if (window.confirm(`Delete ${recordIds.length} records? This action cannot be undone.`)) {
-          const result = await storage.deleteBorrowRecords(recordIds);
-           if (result.success) {
-              await refreshData(true);
-          } else {
-              alert("Failed to delete records.");
-          }
-       }
+       confirmAction(
+        "Delete Multiple Records",
+        `Permanently delete ${recordIds.length} records? This action cannot be undone.`,
+        async () => {
+            const result = await storage.deleteBorrowRecords(recordIds);
+            if (result.success) {
+                await refreshData(true);
+            } else {
+                alert("Failed to delete records.");
+            }
+        },
+        true
+       );
   };
 
   const handleSettingsSave = async (newSettings: AppSettings) => {
@@ -440,6 +488,15 @@ const App: React.FC = () => {
             onCancel={() => setReturnModalState({ isOpen: false })}
           />
       )}
+
+      <ConfirmModal 
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        isDestructive={confirmModal.isDestructive}
+      />
     </div>
   );
 };

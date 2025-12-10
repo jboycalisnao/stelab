@@ -1,8 +1,10 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { BorrowRequest, RequestStatus } from '../types';
 import * as storage from '../services/storageService';
 import { Search, CheckCircle, XCircle, Trash2, Printer, Eye, Clock, FileText, Loader2 } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 
 interface RequestsListProps {
   // 
@@ -15,9 +17,23 @@ const RequestsList: React.FC<RequestsListProps> = () => {
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'All'>('All');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
+  // Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    isDestructive: false
+  });
+
   useEffect(() => {
     loadRequests();
-    // Subscribe to changes? For now just load on mount
   }, []);
 
   const loadRequests = async () => {
@@ -38,31 +54,59 @@ const RequestsList: React.FC<RequestsListProps> = () => {
       });
   }, [requests, searchTerm, statusFilter]);
 
+  const confirmAction = (title: string, message: string, action: () => void, isDestructive = false) => {
+    setConfirmModal({
+        isOpen: true,
+        title,
+        message,
+        onConfirm: () => {
+            action();
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        },
+        isDestructive
+    });
+  };
+
   const handleApprove = async (request: BorrowRequest) => {
-      if (!window.confirm(`Approve request ${request.referenceCode}? This will deduct inventory and create borrow records.`)) return;
-      
-      setProcessingId(request.id);
-      const result = await storage.processApprovedRequest(request);
-      
-      if (result.success) {
-          alert("Request Approved and Processed.");
-          await loadRequests();
-      } else {
-          alert("Failed to process request: " + result.message);
-      }
-      setProcessingId(null);
+      confirmAction(
+        "Approve Request",
+        `Are you sure you want to approve request ${request.referenceCode}? This will deduct inventory and create active borrow records.`,
+        async () => {
+             setProcessingId(request.id);
+            const result = await storage.processApprovedRequest(request);
+            if (result.success) {
+                await loadRequests();
+            } else {
+                alert("Failed to process request: " + result.message);
+            }
+            setProcessingId(null);
+        },
+        false
+      );
   };
 
   const handleReject = async (id: string) => {
-      if (!window.confirm("Reject this request?")) return;
-      await storage.updateBorrowRequestStatus(id, 'Rejected');
-      await loadRequests();
+      confirmAction(
+        "Reject Request",
+        "Are you sure you want to reject this request?",
+        async () => {
+            await storage.updateBorrowRequestStatus(id, 'Rejected');
+            await loadRequests();
+        },
+        true
+      );
   };
 
   const handleDelete = async (id: string) => {
-      if (!window.confirm("Permanently delete this request record?")) return;
-      await storage.deleteBorrowRequest(id);
-      await loadRequests();
+      confirmAction(
+        "Delete Request Record",
+        "Permanently delete this request record? This cannot be undone.",
+        async () => {
+             await storage.deleteBorrowRequest(id);
+             await loadRequests();
+        },
+        true
+      );
   };
 
   const handlePrintSlip = (req: BorrowRequest) => {
@@ -74,69 +118,83 @@ const RequestsList: React.FC<RequestsListProps> = () => {
           printWindow.document.write(`
             <style>
                 @media print {
-                    @page { size: 5.5in 8.5in; margin: 0; }
+                    @page { size: A4 portrait; margin: 0; }
                     body { margin: 0; padding: 0; }
                 }
-                body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #1f2937; }
+                body { font-family: 'Segoe UI', sans-serif; color: #1f2937; }
+                .page-container {
+                    width: 100%;
+                    height: 100vh;
+                }
                 .slip-container { 
-                    width: 5.5in; height: 8.5in; 
-                    margin: 0 auto; 
-                    border: 1px dashed #ccc; 
-                    padding: 30px; 
+                    width: 100%;
+                    height: 148mm; /* Half of A4 height (297mm) */
+                    border-bottom: 1px dashed #ccc; 
+                    padding: 30px 40px; 
                     box-sizing: border-box;
                     position: relative;
                 }
-                .header { border-bottom: 2px solid #2563eb; padding-bottom: 15px; margin-bottom: 20px; text-align: center; }
-                .header h1 { margin: 0; font-size: 1.5em; color: #1e3a8a; }
-                .header p { margin: 5px 0 0; color: #6b7280; font-size: 0.8em; uppercase; letter-spacing: 1px; }
+                .header { border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+                .header h1 { margin: 0; font-size: 1.6em; color: #1e3a8a; }
+                .header p { margin: 2px 0 0; color: #6b7280; font-size: 0.8em; text-transform: uppercase; letter-spacing: 1.5px; }
                 
-                .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; font-size: 0.9em; }
-                .meta-item label { display: block; font-weight: bold; color: #4b5563; font-size: 0.75em; text-transform: uppercase; }
-                .meta-item div { font-weight: 500; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px; }
+                .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; font-size: 0.9em; }
+                .meta-item label { display: block; font-weight: bold; color: #4b5563; font-size: 0.7em; text-transform: uppercase; margin-bottom: 2px; }
+                .meta-item div { font-weight: 500; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 3px; font-size: 1em; }
 
-                table { width: 100%; border-collapse: collapse; font-size: 0.85em; margin-bottom: 20px; }
-                th { background: #f3f4f6; text-align: left; padding: 8px; border-bottom: 2px solid #e5e7eb; }
+                table { width: 100%; border-collapse: collapse; font-size: 0.85em; margin-bottom: 10px; }
+                th { background: #f3f4f6; text-align: left; padding: 8px; border-bottom: 2px solid #e5e7eb; text-transform: uppercase; font-size: 0.75em; color: #4b5563; }
                 td { padding: 8px; border-bottom: 1px solid #e5e7eb; }
                 
-                .qr-section { position: absolute; bottom: 30px; right: 30px; text-align: center; }
-                .qr-section img { width: 100px; height: 100px; }
-                .qr-section .code { font-family: monospace; font-weight: bold; font-size: 1.2em; margin-top: 5px; }
+                .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; position: relative; }
+                
+                .qr-section { position: absolute; bottom: 20px; right: 20px; text-align: center; }
+                .qr-section img { width: 90px; height: 90px; }
+                .qr-section .code { font-family: monospace; font-weight: bold; font-size: 1em; margin-top: 5px; color: #1f2937; }
 
-                .signature-section { margin-top: 50px; }
-                .signature-line { width: 60%; border-top: 1px solid #000; margin-top: 40px; padding-top: 5px; font-size: 0.8em; }
+                .signature-box { margin-top: 10px; }
+                .signature-line { width: 100%; border-top: 1px solid #000; margin-top: 35px; padding-top: 5px; font-size: 0.75em; text-align: center; text-transform: uppercase; color: #4b5563; }
             </style>
           `);
           printWindow.document.write('</head><body>');
           printWindow.document.write(`
-            <div class="slip-container">
-                <div class="header">
-                    <h1>Equipment Borrow Slip</h1>
-                    <p>Laboratory Inventory System</p>
-                </div>
+            <div class="page-container">
+                <div class="slip-container">
+                    <div class="header">
+                        <h1>Equipment Borrow Slip</h1>
+                        <p>Laboratory Inventory System</p>
+                    </div>
 
-                <div class="meta-grid">
-                    <div class="meta-item"><label>Reference Code</label><div>${req.referenceCode}</div></div>
-                    <div class="meta-item"><label>Date Requested</label><div>${new Date(req.requestDate).toLocaleDateString()}</div></div>
-                    <div class="meta-item"><label>Borrower Name</label><div>${req.borrowerName}</div></div>
-                    <div class="meta-item"><label>ID / Section</label><div>${req.borrowerId}</div></div>
-                    <div class="meta-item"><label>Expected Return</label><div>${req.returnDate}</div></div>
-                </div>
+                    <div class="meta-grid">
+                        <div class="meta-item"><label>Reference Code</label><div>${req.referenceCode}</div></div>
+                        <div class="meta-item"><label>Date Requested</label><div>${new Date(req.requestDate).toLocaleDateString()}</div></div>
+                        <div class="meta-item"><label>Borrower Name</label><div>${req.borrowerName}</div></div>
+                        <div class="meta-item"><label>ID / Section</label><div>${req.borrowerId}</div></div>
+                        <div class="meta-item"><label>Expected Return</label><div>${req.returnDate}</div></div>
+                    </div>
 
-                <table>
-                    <thead><tr><th>Item Name</th><th style="text-align:right">Qty</th></tr></thead>
-                    <tbody>
-                        ${req.items.map(i => `<tr><td>${i.itemName}</td><td style="text-align:right">${i.quantity}</td></tr>`).join('')}
-                    </tbody>
-                </table>
+                    <div style="min-height: 150px;">
+                        <table>
+                            <thead><tr><th>Item Name</th><th style="text-align:right">Qty</th></tr></thead>
+                            <tbody>
+                                ${req.items.map(i => `<tr><td>${i.itemName}</td><td style="text-align:right">${i.quantity}</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
 
-                <div class="signature-section">
-                    <div class="signature-line">Borrower Signature</div>
-                    <div class="signature-line">Lab Admin Approval</div>
-                </div>
+                    <div class="footer-grid">
+                        <div class="signature-box">
+                            <div class="signature-line">Borrower Signature</div>
+                        </div>
+                        <div class="signature-box">
+                            <div class="signature-line">Lab Admin Approval</div>
+                        </div>
+                    </div>
 
-                <div class="qr-section">
-                    <img src="${qrUrl}" />
-                    <div class="code">${req.referenceCode}</div>
+                    <div class="qr-section">
+                        <img src="${qrUrl}" />
+                        <div class="code">${req.referenceCode}</div>
+                    </div>
                 </div>
             </div>
           `);
@@ -261,6 +319,15 @@ const RequestsList: React.FC<RequestsListProps> = () => {
                 </div>
             )}
         </div>
+
+        <ConfirmModal 
+            isOpen={confirmModal.isOpen}
+            title={confirmModal.title}
+            message={confirmModal.message}
+            onConfirm={confirmModal.onConfirm}
+            onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+            isDestructive={confirmModal.isDestructive}
+        />
     </div>
   );
 };

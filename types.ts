@@ -60,8 +60,6 @@ export interface BorrowRecord {
 export interface AppSettings {
   appName: string;
   logoUrl?: string;
-  loginBackgroundUrl?: string;
-  dashboardBackgroundUrl?: string;
   customFooterText?: string;
   adminUsername?: string;
   adminPassword?: string;

@@ -1,14 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AppSettings, Category } from '../types';
 import * as storage from '../services/storageService';
-import { Upload, Save, CheckCircle, Plus, Trash2, Edit2, X, Image as ImageIcon, Loader2, LayoutDashboard, Type, Lock, User, Eye, EyeOff, Mail, Server, FileCode, Key, AlertCircle } from 'lucide-react';
+import { Upload, Save, CheckCircle, Plus, Trash2, Edit2, X, Loader2, Type, Lock, User, Eye, EyeOff, Mail, Server, FileCode, Key } from 'lucide-react';
 
 interface SettingsProps {
   settings: AppSettings;
   onSave: (settings: AppSettings) => void;
 }
 
-// Helper for image compression (unchanged)
+// Helper for image compression
 const processImage = (file: File, maxWidth: number, quality: number): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -54,8 +54,6 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
   const [showEmailJsKey, setShowEmailJsKey] = useState(false);
   
   const logoInputRef = useRef<HTMLInputElement>(null);
-  const bgInputRef = useRef<HTMLInputElement>(null);
-  const dashboardBgInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadCategories();
@@ -75,7 +73,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
     setSaved(false);
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'logoUrl' | 'loginBackgroundUrl' | 'dashboardBackgroundUrl') => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -83,10 +81,10 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
     setSaved(false);
 
     try {
-        const maxWidth = field === 'logoUrl' ? 400 : 1280; 
-        const quality = field === 'logoUrl' ? 0.8 : 0.6; 
+        const maxWidth = 400; 
+        const quality = 0.8; 
         const compressedDataUrl = await processImage(file, maxWidth, quality);
-        setFormData(prev => ({ ...prev, [field]: compressedDataUrl }));
+        setFormData(prev => ({ ...prev, logoUrl: compressedDataUrl }));
     } catch (error) {
         console.error("Image processing failed:", error);
         alert("Failed to process image.");
@@ -95,8 +93,8 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
     }
   };
 
-  const handleRemoveImage = (field: 'logoUrl' | 'loginBackgroundUrl' | 'dashboardBackgroundUrl') => {
-      setFormData(prev => ({ ...prev, [field]: undefined }));
+  const handleRemoveImage = () => {
+      setFormData(prev => ({ ...prev, logoUrl: undefined }));
       setSaved(false);
   };
 
@@ -174,38 +172,8 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
                       </div>
                       <div className="space-y-2">
                           <button type="button" onClick={() => logoInputRef.current?.click()} disabled={isProcessing} className="flex items-center space-x-2 px-4 py-2 border border-white/60 bg-white/40 rounded-lg hover:bg-white/60 text-sm font-medium text-gray-700 transition-colors disabled:opacity-50"><Upload className="w-4 h-4" /><span>Upload New Logo</span></button>
-                          <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'logoUrl')} />
-                          {formData.logoUrl && !isProcessing && <button type="button" onClick={() => handleRemoveImage('logoUrl')} className="text-sm text-red-500 hover:text-red-700 block">Remove Logo</button>}
-                      </div>
-                  </div>
-                </div>
-
-                {/* Login BG Upload */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Login Background</label>
-                  <div className="flex items-center space-x-6">
-                      <div className="w-32 h-20 bg-white/40 rounded-lg flex items-center justify-center overflow-hidden border border-white/50 bg-cover bg-center shadow-inner" style={{ backgroundImage: formData.loginBackgroundUrl && !isProcessing ? `url(${formData.loginBackgroundUrl})` : undefined }}>
-                      {isProcessing ? <Loader2 className="w-6 h-6 text-blue-500 animate-spin" /> : !formData.loginBackgroundUrl && <span className="text-gray-400 text-xs text-center px-2">No Image</span>}
-                      </div>
-                      <div className="space-y-2">
-                          <button type="button" onClick={() => bgInputRef.current?.click()} disabled={isProcessing} className="flex items-center space-x-2 px-4 py-2 border border-white/60 bg-white/40 rounded-lg hover:bg-white/60 text-sm font-medium text-gray-700 transition-colors disabled:opacity-50"><ImageIcon className="w-4 h-4" /><span>Upload Login BG</span></button>
-                          <input type="file" ref={bgInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'loginBackgroundUrl')} />
-                          {formData.loginBackgroundUrl && !isProcessing && <button type="button" onClick={() => handleRemoveImage('loginBackgroundUrl')} className="text-sm text-red-500 hover:text-red-700 block">Remove Background</button>}
-                      </div>
-                  </div>
-                </div>
-
-                {/* Dashboard BG Upload */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Dashboard Background</label>
-                  <div className="flex items-center space-x-6">
-                      <div className="w-32 h-20 bg-white/40 rounded-lg flex items-center justify-center overflow-hidden border border-white/50 bg-cover bg-center shadow-inner" style={{ backgroundImage: formData.dashboardBackgroundUrl && !isProcessing ? `url(${formData.dashboardBackgroundUrl})` : undefined }}>
-                      {isProcessing ? <Loader2 className="w-6 h-6 text-blue-500 animate-spin" /> : !formData.dashboardBackgroundUrl && <span className="text-gray-400 text-xs text-center px-2">No Image</span>}
-                      </div>
-                      <div className="space-y-2">
-                          <button type="button" onClick={() => dashboardBgInputRef.current?.click()} disabled={isProcessing} className="flex items-center space-x-2 px-4 py-2 border border-white/60 bg-white/40 rounded-lg hover:bg-white/60 text-sm font-medium text-gray-700 transition-colors disabled:opacity-50"><LayoutDashboard className="w-4 h-4" /><span>Upload Dash BG</span></button>
-                          <input type="file" ref={dashboardBgInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'dashboardBackgroundUrl')} />
-                          {formData.dashboardBackgroundUrl && !isProcessing && <button type="button" onClick={() => handleRemoveImage('dashboardBackgroundUrl')} className="text-sm text-red-500 hover:text-red-700 block">Remove Background</button>}
+                          <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                          {formData.logoUrl && !isProcessing && <button type="button" onClick={handleRemoveImage} className="text-sm text-red-500 hover:text-red-700 block">Remove Logo</button>}
                       </div>
                   </div>
                 </div>
