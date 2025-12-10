@@ -104,7 +104,7 @@ export interface AuditLog {
 
 // --- Borrow Request Types ---
 
-export type RequestStatus = 'Pending' | 'Approved' | 'Rejected' | 'Completed' | 'Cancelled' | 'Released';
+export type RequestStatus = 'Pending' | 'Approved' | 'Rejected' | 'Completed' | 'Cancelled' | 'Released' | 'Returned';
 
 export interface RequestItem {
   itemId: string;

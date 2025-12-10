@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { InventoryItem, BorrowRecord, AppSettings, Category } from './types';
+import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
 import { supabase } from './supabaseClient';
 import Dashboard from './components/Dashboard';
@@ -27,6 +27,7 @@ const App: React.FC = () => {
   const [borrowRecords, setBorrowRecords] = useState<BorrowRecord[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [requests, setRequests] = useState<BorrowRequest[]>([]);
   
   const [view, setView] = useState<'dashboard' | 'inventory' | 'lending' | 'scanner' | 'settings' | 'requests'>('dashboard');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -62,16 +63,18 @@ const App: React.FC = () => {
   const refreshData = React.useCallback(async (silent = false) => {
       if (!silent) setIsLoading(true);
       try {
-          const [loadedItems, loadedRecords, loadedSettings, loadedCats] = await Promise.all([
+          const [loadedItems, loadedRecords, loadedSettings, loadedCats, loadedRequests] = await Promise.all([
               storage.getInventory(),
               storage.getBorrowRecords(),
               storage.getSettings(),
-              storage.getCategories()
+              storage.getCategories(),
+              storage.getBorrowRequests()
           ]);
           setItems(loadedItems);
           setBorrowRecords(loadedRecords);
           setSettings(loadedSettings);
           setCategories(loadedCats);
+          setRequests(loadedRequests);
       } catch (e) {
           console.error("Data Load Error", e);
       } finally {
@@ -447,6 +450,7 @@ const App: React.FC = () => {
                             {view === 'lending' && !isMobile && (
                                 <LendingList 
                                     records={borrowRecords}
+                                    requests={requests}
                                     onReturn={initiateReturn}
                                     onReturnBulk={handleBulkReturn}
                                     onDelete={handleDeleteBorrowRecord}

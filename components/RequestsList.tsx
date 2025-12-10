@@ -46,11 +46,23 @@ const RequestsList: React.FC<RequestsListProps> = () => {
   };
 
   const filteredRequests = useMemo(() => {
+      const lowerTerm = searchTerm.toLowerCase();
       return requests.filter(req => {
-          const matchesSearch = req.borrowerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                              req.referenceCode.toLowerCase().includes(searchTerm.toLowerCase());
+          // Check Request Level Details: Borrower, Reference Code, Internal ID
+          const matchesRequest = 
+              req.borrowerName.toLowerCase().includes(lowerTerm) || 
+              req.referenceCode.toLowerCase().includes(lowerTerm) ||
+              req.id.toLowerCase().includes(lowerTerm);
+          
+          // Check Item Level Details: Name, Item ID, Linked Record ID
+          const matchesItems = req.items && req.items.some(item => 
+              item.itemName.toLowerCase().includes(lowerTerm) ||
+              item.itemId.toLowerCase().includes(lowerTerm) ||
+              (item.linkedRecordId && item.linkedRecordId.toLowerCase().includes(lowerTerm))
+          );
+
           const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
-          return matchesSearch && matchesStatus;
+          return (matchesRequest || matchesItems) && matchesStatus;
       });
   }, [requests, searchTerm, statusFilter]);
 
@@ -228,6 +240,7 @@ const RequestsList: React.FC<RequestsListProps> = () => {
           case 'Rejected': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">Rejected</span>;
           case 'Completed': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">Completed (Returned)</span>;
           case 'Released': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">Released</span>;
+          case 'Returned': return <span className="px-2 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-700">Returned</span>;
           default: return <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">{status}</span>;
       }
   };
@@ -240,7 +253,7 @@ const RequestsList: React.FC<RequestsListProps> = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
                 <input
                     type="text"
-                    placeholder="Search by name or code..."
+                    placeholder="Search by borrower, code, item name, or ID..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm backdrop-blur-sm"

@@ -107,14 +107,8 @@ const updateRequestStatusByLinkedRecord = async (recordId: string) => {
     try {
         // 1. Find the request containing this recordId
         // Since we store items as JSON, we need to search within the JSON array
-        const { data: requests } = await supabase
-            .from('borrow_requests')
-            .select('*')
-            .contains('items', JSON.stringify([{ linkedRecordId: recordId }])); // Simple containment check might not work perfectly for complex JSONB arrays depending on structure, so we might need a broader scan or better query.
-            
         // Better approach: fetch requests where status is Approved or Released
         // and scan their items in JS since we can't easily perform "contains item with linkedRecordId=X" in standard PostgREST without specific JSON operators.
-        // Given volume is likely low, we can fetch 'Active' requests.
         
         const { data: activeRequests } = await supabase
             .from('borrow_requests')
@@ -140,7 +134,7 @@ const updateRequestStatusByLinkedRecord = async (recordId: string) => {
                         if (allReturned) {
                              await supabase
                                 .from('borrow_requests')
-                                .update({ status: 'Completed' })
+                                .update({ status: 'Returned' })
                                 .eq('id', req.id);
                         }
                     }

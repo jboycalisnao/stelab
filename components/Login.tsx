@@ -166,6 +166,7 @@ const Login: React.FC<LoginProps> = ({
           case 'Rejected': return 'text-red-600 bg-red-50 border-red-200';
           case 'Completed': return 'text-blue-600 bg-blue-50 border-blue-200';
           case 'Released': return 'text-indigo-600 bg-indigo-50 border-indigo-200';
+          case 'Returned': return 'text-teal-600 bg-teal-50 border-teal-200';
           default: return 'text-gray-600 bg-gray-50';
       }
   };
@@ -244,7 +245,7 @@ const Login: React.FC<LoginProps> = ({
                                                 <div className="text-xs text-gray-500 mt-0.5">Ref: {trackResult.referenceCode}</div>
                                             </div>
                                             <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${getStatusColor(trackResult.status)}`}>
-                                                {trackResult.status === 'Released' ? 'Released (Active)' : trackResult.status === 'Completed' ? 'Returned' : trackResult.status}
+                                                {trackResult.status === 'Released' ? 'Released (Active)' : (trackResult.status === 'Completed' || trackResult.status === 'Returned') ? 'Returned' : trackResult.status}
                                             </div>
                                         </div>
                                     )}

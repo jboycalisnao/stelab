@@ -1,30 +1,47 @@
 
 
 import React, { useState, useMemo } from 'react';
-import { BorrowRecord } from '../types';
+import { BorrowRecord, BorrowRequest } from '../types';
 import { Search, RotateCcw, CheckSquare, Square, ChevronDown, ChevronRight, Package, Trash2 } from 'lucide-react';
 import { getCategoryIcon, getCategoryColor } from '../constants';
 
 interface LendingListProps {
   records: BorrowRecord[];
+  requests: BorrowRequest[];
   onReturn: (recordId: string) => void;
   onReturnBulk: (recordIds: string[]) => void;
   onDelete: (recordId: string) => void;
   onDeleteBulk: (recordIds: string[]) => void;
 }
 
-const LendingList: React.FC<LendingListProps> = ({ records, onReturn, onReturnBulk, onDelete, onDeleteBulk }) => {
+const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, onReturnBulk, onDelete, onDeleteBulk }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Borrowed' | 'Returned'>('All');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
+  // Create Lookup Map for Request Reference Codes
+  const recordRequestMap = useMemo(() => {
+      const map = new Map<string, string>(); // recordId -> refCode
+      requests.forEach(req => {
+          req.items.forEach(item => {
+              if (item.linkedRecordId) {
+                  map.set(item.linkedRecordId, req.referenceCode);
+              }
+          });
+      });
+      return map;
+  }, [requests]);
+
   // 1. Filter Records
   const filteredRecords = useMemo(() => {
      return records.filter(record => {
+        const refCode = recordRequestMap.get(record.id) || '';
+        
         const matchesSearch = 
             record.itemName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            record.borrowerName.toLowerCase().includes(searchTerm.toLowerCase());
+            record.borrowerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            refCode.toLowerCase().includes(searchTerm.toLowerCase());
         
         const matchesStatus = filterStatus === 'All' || 
             (filterStatus === 'Borrowed' && record.status === 'Borrowed') ||
@@ -32,7 +49,7 @@ const LendingList: React.FC<LendingListProps> = ({ records, onReturn, onReturnBu
 
         return matchesSearch && matchesStatus;
     }).sort((a, b) => new Date(b.borrowDate).getTime() - new Date(a.borrowDate).getTime());
-  }, [records, searchTerm, filterStatus]);
+  }, [records, searchTerm, filterStatus, recordRequestMap]);
 
   // 2. Group Records
   const groupedRecords = useMemo(() => {
@@ -109,7 +126,7 @@ const LendingList: React.FC<LendingListProps> = ({ records, onReturn, onReturnBu
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
           <input
             type="text"
-            placeholder="Search items or borrowers..."
+            placeholder="Search by item, borrower, or Request ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-white/60 bg-white/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-800 placeholder-gray-500 backdrop-blur-sm"
@@ -213,6 +230,11 @@ const LendingList: React.FC<LendingListProps> = ({ records, onReturn, onReturnBu
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-900 text-sm">{record.borrowerName}</div>
                                                 <div className="text-xs text-gray-500">{record.borrowerId}</div>
+                                                {recordRequestMap.get(record.id) && (
+                                                    <div className="text-[10px] text-blue-600 font-mono mt-0.5 flex items-center gap-1">
+                                                        <span className="opacity-75">REF:</span> {recordRequestMap.get(record.id)}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-sm font-medium text-gray-700">
                                                 {record.quantity}
