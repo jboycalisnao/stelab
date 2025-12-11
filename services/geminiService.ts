@@ -2,7 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AIAnalysisResult } from "../types";
 
 // Safely retrieve API Key to prevent runtime crashes if process is undefined
-const getApiKey = () => {
+const getApiKey = (AIzaSyDnTjbL0XCdV4XbuBR5MhOP5sd1hssQI0s) => {
   try {
     // @ts-ignore
     if (typeof process !== 'undefined' && process.env) {
