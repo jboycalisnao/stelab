@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { InventoryItem, ItemCondition, Category } from '../types';
-import { Edit2, Trash2, QrCode, Search, Filter, HandPlatter, Barcode, FileText, List, Printer, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Edit2, Trash2, QrCode, Search, Filter, HandPlatter, Barcode, FileText, List, Printer, AlertTriangle, CheckCircle, XCircle, Clipboard } from 'lucide-react';
 import { getCategoryColor, getCategoryIcon } from '../constants';
 
 interface InventoryListProps {
@@ -148,6 +148,93 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
       }
   };
 
+  const handlePrintWorksheet = () => {
+    const printWindow = window.open('', '', 'height=800,width=900');
+    if (printWindow) {
+        printWindow.document.write('<html><head><title>Inventory Encoding Worksheet</title>');
+        printWindow.document.write(`
+          <style>
+              body { font-family: 'Inter', system-ui, sans-serif; padding: 20px; color: #111827; }
+              .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2005A2; padding-bottom: 10px; margin-bottom: 20px; }
+              .header h1 { margin: 0; font-size: 1.5em; color: #2005A2; text-transform: uppercase; letter-spacing: 0.05em; }
+              .header p { margin: 0; font-size: 0.9em; color: #6b7280; }
+              
+              table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+              th, td { border: 1px solid #e5e7eb; padding: 12px 8px; text-align: left; vertical-align: top; }
+              th { background-color: #f3f4f6; font-weight: 600; color: #374151; text-transform: uppercase; font-size: 0.75em; letter-spacing: 0.05em; }
+              
+              /* Empty row styling for writing */
+              tr.empty-row td { height: 40px; }
+              
+              .footer { margin-top: 30px; font-size: 0.8em; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+              
+              @media print { 
+                  body { padding: 0; }
+                  th { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; }
+              }
+          </style>
+        `);
+        printWindow.document.write('</head><body>');
+        
+        printWindow.document.write(`
+            <div class="header">
+                <div>
+                    <h1>Inventory Encoding Worksheet</h1>
+                    <p>Science & Technology Laboratory</p>
+                </div>
+                <div style="text-align: right;">
+                    <p>Date: __________________</p>
+                    <p>Encoder: ________________</p>
+                </div>
+            </div>
+        `);
+
+        printWindow.document.write(`
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 25%">Item Name</th>
+                        <th style="width: 15%">Category</th>
+                        <th style="width: 10%">Total Qty</th>
+                        <th style="width: 10%">Loan Limit*</th>
+                        <th style="width: 15%">Location</th>
+                        <th style="width: 10%">Condition</th>
+                        <th style="width: 15%">Notes / Safety</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `);
+
+        // Generate 20 empty rows for writing
+        for(let i=0; i<20; i++) {
+            printWindow.document.write(`
+                <tr class="empty-row">
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            `);
+        }
+
+        printWindow.document.write(`
+                </tbody>
+            </table>
+            <div class="footer">
+                <p>* Loan Limit: Specify if only a portion of stock (e.g., loose items) is available for borrowing.</p>
+                <p>System Generated Form • SciLab Inventory Pro</p>
+            </div>
+        `);
+
+        printWindow.document.write('<script>window.onload = function() { window.print(); }</script>');
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+    }
+  };
+
   const getConditionBadge = (condition: ItemCondition) => {
     switch (condition) {
       case ItemCondition.Good: return <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">Good</span>;
@@ -201,17 +288,26 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                 </div>
                 
                 <div className="flex items-center space-x-2 w-full sm:w-auto">
-                <Filter className="text-gray-500 w-4 h-4" />
-                <select 
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer bg-white text-gray-800 shadow-sm"
-                    value={filterCategory}
-                    onChange={(e) => setFilterCategory(e.target.value)}
-                >
-                    <option value="All" className="bg-white text-gray-800">All Categories</option>
-                    {categories.map(cat => (
-                    <option key={cat.id} value={cat.name} className="bg-white text-gray-800">{cat.name}</option>
-                    ))}
-                </select>
+                    <button 
+                        onClick={handlePrintWorksheet}
+                        className="flex items-center space-x-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors border border-gray-200 shadow-sm text-sm font-medium"
+                        title="Print empty form for manual recording"
+                    >
+                        <Clipboard className="w-4 h-4" />
+                        <span className="hidden sm:inline">Worksheet</span>
+                    </button>
+                    <div className="h-6 w-px bg-gray-300 mx-2 hidden sm:block"></div>
+                    <Filter className="text-gray-500 w-4 h-4" />
+                    <select 
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer bg-white text-gray-800 shadow-sm"
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                    >
+                        <option value="All" className="bg-white text-gray-800">All Categories</option>
+                        {categories.map(cat => (
+                        <option key={cat.id} value={cat.name} className="bg-white text-gray-800">{cat.name}</option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
@@ -222,94 +318,104 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                     <tr>
                     <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Item Name</th>
                     <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Qty (Avail/Total)</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock (Avail/Total)</th>
                     <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
                     <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Condition</th>
                     <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
-                    {filteredItems.length > 0 ? filteredItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
-                        <td className="px-6 py-4">
-                        <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 overflow-hidden border border-gray-200 shadow-sm">
-                                <div style={{ color: getCategoryColor(item.category) }}>
-                                {getCategoryIcon(item.category)}
+                    {filteredItems.length > 0 ? filteredItems.map((item) => {
+                        const borrowLimit = item.maxBorrowable !== undefined ? item.maxBorrowable : item.quantity;
+                        const available = Math.max(0, borrowLimit - (item.borrowedQuantity || 0));
+                        const isRestricted = item.maxBorrowable !== undefined && item.maxBorrowable < item.quantity;
+
+                        return (
+                        <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
+                            <td className="px-6 py-4">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 overflow-hidden border border-gray-200 shadow-sm">
+                                    <div style={{ color: getCategoryColor(item.category) }}>
+                                    {getCategoryIcon(item.category)}
+                                    </div>
+                                </div>
+                                <div>
+                                <div className="font-medium text-gray-900">{item.name}</div>
+                                <div className="text-xs text-gray-500 truncate max-w-[200px]">{item.description}</div>
+                                {item.shortId && <div className="text-[10px] text-gray-400 font-mono mt-0.5 bg-gray-100 inline-block px-1 rounded border border-gray-200">{item.shortId}</div>}
                                 </div>
                             </div>
-                            <div>
-                            <div className="font-medium text-gray-900">{item.name}</div>
-                            <div className="text-xs text-gray-500 truncate max-w-[200px]">{item.description}</div>
-                            {item.shortId && <div className="text-[10px] text-gray-400 font-mono mt-0.5 bg-gray-100 inline-block px-1 rounded border border-gray-200">{item.shortId}</div>}
+                            </td>
+                            <td className="px-6 py-4">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 border border-gray-200 text-gray-800">
+                                {item.category}
+                            </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                            <div className="flex flex-col">
+                                    <span className={`font-medium ${available === 0 ? 'text-red-600' : ''}`}>
+                                        {available} / {item.quantity}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-[10px] text-gray-400">{item.unit}</span>
+                                        {isRestricted && (
+                                            <span className="text-[9px] px-1 rounded bg-blue-50 text-blue-600 border border-blue-100" title={`Borrowing limited to ${item.maxBorrowable} units`}>Limited</span>
+                                        )}
+                                    </div>
                             </div>
-                        </div>
-                        </td>
-                        <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 border border-gray-200 text-gray-800">
-                            {item.category}
-                        </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                        <div className="flex flex-col">
-                                <span className="font-medium">
-                                    {item.quantity - (item.borrowedQuantity || 0)} / {item.quantity}
-                                </span>
-                                <span className="text-[10px] text-gray-400">{item.unit}</span>
-                        </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                        {item.location}
-                        </td>
-                        <td className="px-6 py-4">
-                        {getConditionBadge(item.condition)}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end space-x-2 transition-opacity">
-                            <button 
-                            onClick={() => onBorrow(item)}
-                            disabled={(item.quantity - (item.borrowedQuantity || 0)) <= 0}
-                            className={`p-1.5 rounded-md transition-colors ${
-                                (item.quantity - (item.borrowedQuantity || 0)) > 0 
-                                ? 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50' 
-                                : 'text-gray-300 cursor-not-allowed'
-                            }`}
-                            title="Borrow Item"
-                            >
-                            <HandPlatter className="w-4 h-4" />
-                            </button>
-                            <button 
-                            onClick={() => onPrintBarcodes(item)}
-                            className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
-                            title="Print Bulk Barcodes"
-                            >
-                            <Barcode className="w-4 h-4" />
-                            </button>
-                            <button 
-                            onClick={() => onShowQR(item)}
-                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                            title="View QR Code"
-                            >
-                            <QrCode className="w-4 h-4" />
-                            </button>
-                            <button 
-                            onClick={() => onEdit(item)}
-                            className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors"
-                            title="Edit Item"
-                            >
-                            <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button 
-                            onClick={() => onDelete(item.id)}
-                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                            title="Delete Item"
-                            >
-                            <Trash2 className="w-4 h-4" />
-                            </button>
-                        </div>
-                        </td>
-                    </tr>
-                    )) : (
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                            {item.location}
+                            </td>
+                            <td className="px-6 py-4">
+                            {getConditionBadge(item.condition)}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end space-x-2 transition-opacity">
+                                <button 
+                                onClick={() => onBorrow(item)}
+                                disabled={available <= 0}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                    available > 0 
+                                    ? 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50' 
+                                    : 'text-gray-300 cursor-not-allowed'
+                                }`}
+                                title="Borrow Item"
+                                >
+                                <HandPlatter className="w-4 h-4" />
+                                </button>
+                                <button 
+                                onClick={() => onPrintBarcodes(item)}
+                                className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
+                                title="Print Bulk Barcodes"
+                                >
+                                <Barcode className="w-4 h-4" />
+                                </button>
+                                <button 
+                                onClick={() => onShowQR(item)}
+                                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                title="View QR Code"
+                                >
+                                <QrCode className="w-4 h-4" />
+                                </button>
+                                <button 
+                                onClick={() => onEdit(item)}
+                                className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                                title="Edit Item"
+                                >
+                                <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button 
+                                onClick={() => onDelete(item.id)}
+                                className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                title="Delete Item"
+                                >
+                                <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                            </td>
+                        </tr>
+                    )}) : (
                         <tr>
                             <td colSpan={6} className="px-6 py-12 text-center text-gray-500 font-medium">
                                 No equipment found matching your search.

@@ -326,23 +326,37 @@ const Login: React.FC<LoginProps> = ({
                                     <Box className="w-5 h-5 text-maroon-600" />
                                     <h3 className="text-lg font-bold text-gray-800">Availability Status</h3>
                                 </div>
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-4xl font-extrabold text-maroon-600">
-                                        {publicItem.quantity - (publicItem.borrowedQuantity || 0)}
-                                    </span>
-                                    <span className="text-lg text-gray-500 font-medium">
-                                        pieces available
-                                    </span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2 mt-4 overflow-hidden">
-                                    <div 
-                                        className="bg-maroon-500 h-full rounded-full transition-all duration-500" 
-                                        style={{ width: `${((publicItem.quantity - (publicItem.borrowedQuantity || 0)) / publicItem.quantity) * 100}%` }}
-                                    ></div>
-                                </div>
-                                <p className="text-xs text-gray-400 mt-2 text-right">
-                                    Total in Inventory: {publicItem.quantity} {publicItem.unit || 'units'}
-                                </p>
+                                {(() => {
+                                    // Use Borrow Limit if defined
+                                    const limit = publicItem.maxBorrowable !== undefined ? publicItem.maxBorrowable : publicItem.quantity;
+                                    const available = Math.max(0, limit - (publicItem.borrowedQuantity || 0));
+                                    const percentage = (available / limit) * 100;
+                                    
+                                    return (
+                                        <>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-4xl font-extrabold text-maroon-600">
+                                                    {available}
+                                                </span>
+                                                <span className="text-lg text-gray-500 font-medium">
+                                                    pieces available
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-gray-200 rounded-full h-2 mt-4 overflow-hidden">
+                                                <div 
+                                                    className="bg-maroon-500 h-full rounded-full transition-all duration-500" 
+                                                    style={{ width: `${percentage}%` }}
+                                                ></div>
+                                            </div>
+                                            <p className="text-xs text-gray-400 mt-2 text-right">
+                                                {publicItem.maxBorrowable !== undefined 
+                                                    ? `Limited Stock (Total Inventory: ${publicItem.quantity} ${publicItem.unit || 'units'})`
+                                                    : `Total in Inventory: ${publicItem.quantity} ${publicItem.unit || 'units'}`
+                                                }
+                                            </p>
+                                        </>
+                                    );
+                                })()}
                             </div>
 
                             {/* Details Grid */}

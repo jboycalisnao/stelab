@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { InventoryItem } from '../types';
-import { X, HandPlatter, Search, Tag } from 'lucide-react';
+import { X, HandPlatter, Search, Tag, Lock } from 'lucide-react';
 
 interface BorrowModalProps {
   availableItems: InventoryItem[];
@@ -29,19 +29,27 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
   }, [specificId]);
 
   const selectedItem = availableItems.find(i => i.id === selectedItemId);
-  const available = selectedItem ? selectedItem.quantity - (selectedItem.borrowedQuantity || 0) : 0;
+  
+  // Calculate availability based on borrow limit if it exists
+  const borrowLimit = selectedItem ? (selectedItem.maxBorrowable !== undefined ? selectedItem.maxBorrowable : selectedItem.quantity) : 0;
+  const available = selectedItem ? Math.max(0, borrowLimit - (selectedItem.borrowedQuantity || 0)) : 0;
+  const isRestricted = selectedItem && selectedItem.maxBorrowable !== undefined && selectedItem.maxBorrowable < selectedItem.quantity;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItem) return;
     if (quantity > available) {
-        alert("Quantity exceeds available stock.");
+        alert("Quantity exceeds available loan stock.");
         return;
     }
     onConfirm(selectedItem, borrowerName, borrowerId, quantity, dueDate, specificId);
   };
 
-  const stockItems = availableItems.filter(i => (i.quantity - (i.borrowedQuantity || 0)) > 0);
+  // Filter items that have available stock for borrowing
+  const stockItems = availableItems.filter(i => {
+      const limit = i.maxBorrowable !== undefined ? i.maxBorrowable : i.quantity;
+      return (limit - (i.borrowedQuantity || 0)) > 0;
+  });
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -63,10 +71,18 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
             {initialItem ? (
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                     <h4 className="font-semibold text-blue-900">{initialItem.name}</h4>
-                    <div className="text-sm text-blue-700 flex justify-between mt-1">
-                        <span>Total: {initialItem.quantity}</span>
+                    <div className="text-sm text-blue-700 flex justify-between mt-1 items-center">
+                        <span className="flex items-center gap-1">
+                            {isRestricted && <Lock className="w-3 h-3"/>}
+                            Total Stock: {initialItem.quantity}
+                        </span>
                         <span className="font-bold">Available: {available}</span>
                     </div>
+                    {isRestricted && (
+                        <p className="text-xs text-blue-500 mt-1">
+                            * Restricted to {initialItem.maxBorrowable} borrowable units.
+                        </p>
+                    )}
                     {specificId && (
                         <div className="mt-2 flex items-center gap-2 text-xs font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded w-fit">
                             <Tag className="w-3 h-3" />
@@ -87,11 +103,15 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 appearance-none shadow-sm bg-white disabled:bg-gray-100"
                     >
                         <option value="" disabled className="text-gray-500">Select Equipment...</option>
-                        {stockItems.map(item => (
-                            <option key={item.id} value={item.id} className="text-gray-900">
-                                {item.name} ({item.quantity - (item.borrowedQuantity || 0)} avail)
-                            </option>
-                        ))}
+                        {stockItems.map(item => {
+                            const limit = item.maxBorrowable !== undefined ? item.maxBorrowable : item.quantity;
+                            const avail = Math.max(0, limit - (item.borrowedQuantity || 0));
+                            return (
+                                <option key={item.id} value={item.id} className="text-gray-900">
+                                    {item.name} ({avail} avail)
+                                </option>
+                            );
+                        })}
                     </select>
                     {!specificId && (
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
@@ -100,7 +120,7 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
                     )}
                     {selectedItem && (
                          <div className="mt-2 text-xs text-blue-600 font-medium text-right">
-                            {available} units available
+                            {available} units available for loan
                          </div>
                     )}
                 </div>

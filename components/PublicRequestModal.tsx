@@ -30,7 +30,12 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
   const loadInventory = async () => {
     setIsLoading(true);
     const data = await storage.getInventory();
-    setItems(data.filter(i => (i.quantity - i.borrowedQuantity) > 0)); // Only show available
+    // Filter items that have available stock based on borrow limits
+    const availableItems = data.filter(i => {
+        const limit = i.maxBorrowable !== undefined ? i.maxBorrowable : i.quantity;
+        return (limit - (i.borrowedQuantity || 0)) > 0;
+    });
+    setItems(availableItems);
     setIsLoading(false);
   };
 
@@ -41,11 +46,17 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
       );
   }, [items, searchTerm]);
 
+  const getAvailableQty = (item: InventoryItem) => {
+      const limit = item.maxBorrowable !== undefined ? item.maxBorrowable : item.quantity;
+      return Math.max(0, limit - (item.borrowedQuantity || 0));
+  };
+
   const addItem = (item: InventoryItem) => {
+      const available = getAvailableQty(item);
       setSelectedItems(prev => {
           const existing = prev.find(p => p.itemId === item.id);
           if (existing) {
-              if (existing.quantity < (item.quantity - item.borrowedQuantity)) {
+              if (existing.quantity < available) {
                   return prev.map(p => p.itemId === item.id ? { ...p, quantity: p.quantity + 1 } : p);
               }
               return prev;
@@ -65,7 +76,7 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
       }
       const invItem = items.find(i => i.id === itemId);
       if (!invItem) return;
-      const max = invItem.quantity - invItem.borrowedQuantity;
+      const max = getAvailableQty(invItem);
       
       setSelectedItems(prev => prev.map(p => p.itemId === itemId ? { ...p, quantity: Math.min(qty, max) } : p));
   };
@@ -151,7 +162,7 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                          </div>
                          <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                              {filteredInventory.map(item => {
-                                 const available = item.quantity - item.borrowedQuantity;
+                                 const available = getAvailableQty(item);
                                  const inCart = selectedItems.find(p => p.itemId === item.id)?.quantity || 0;
                                  const canAdd = inCart < available;
 

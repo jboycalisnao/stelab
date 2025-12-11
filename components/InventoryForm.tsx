@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { InventoryItem, ItemCondition, Category } from '../types';
 import { enrichTextData } from '../services/geminiService';
-import { Loader2, Sparkles, X } from 'lucide-react';
+import { Loader2, Sparkles, X, Box, Lock } from 'lucide-react';
 
 interface InventoryFormProps {
   initialData?: InventoryItem;
@@ -23,10 +23,12 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
       safetyNotes: '',
       borrowedQuantity: 0,
       shortId: undefined,
-      isConsumable: false
+      isConsumable: false,
+      maxBorrowable: undefined
     }
   );
 
+  const [useBorrowLimit, setUseBorrowLimit] = useState<boolean>(!!initialData?.maxBorrowable);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -36,6 +38,11 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
     } else {
         setFormData(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  const handleLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = parseInt(e.target.value);
+      setFormData(prev => ({ ...prev, maxBorrowable: isNaN(val) ? undefined : val }));
   };
 
   const handleSmartEnrich = async () => {
@@ -66,7 +73,19 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
         alert("Please fill in all required fields.");
         return;
     }
-    onSubmit(formData as InventoryItem);
+    
+    // Logic check: Max borrowable shouldn't exceed total quantity
+    const finalData = { ...formData };
+    if (!useBorrowLimit) {
+        finalData.maxBorrowable = undefined;
+    } else if (finalData.maxBorrowable !== undefined && finalData.quantity !== undefined) {
+        if (finalData.maxBorrowable > finalData.quantity) {
+             alert("Borrow limit cannot be higher than total quantity.");
+             return;
+        }
+    }
+
+    onSubmit(finalData as InventoryItem);
   };
 
   return (
@@ -139,8 +158,11 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                    <Box className="w-4 h-4 text-gray-500"/>
+                    Total Quantity (Physical) *
+                </label>
                 <input
                   type="number"
                   name="quantity"
@@ -163,6 +185,46 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                   placeholder="e.g. sets, pcs, boxes"
                 />
               </div>
+            </div>
+
+            {/* Borrow Limit Section */}
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <div className="flex items-center space-x-3 mb-2">
+                    <input
+                        type="checkbox"
+                        id="useBorrowLimit"
+                        checked={useBorrowLimit}
+                        onChange={(e) => setUseBorrowLimit(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded border-blue-300 focus:ring-blue-500"
+                    />
+                    <label htmlFor="useBorrowLimit" className="text-sm font-bold text-gray-800 cursor-pointer select-none flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-blue-600" />
+                        Set Borrowing Limit (Boxed Stock)
+                    </label>
+                </div>
+                
+                {useBorrowLimit && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-200 ml-7">
+                        <p className="text-xs text-gray-600 mb-2">
+                            Specify the quantity available for daily lending. Use this if you have sealed boxes you don't want opened.
+                        </p>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="number"
+                                name="maxBorrowable"
+                                min="0"
+                                max={formData.quantity}
+                                value={formData.maxBorrowable || ''}
+                                onChange={handleLimitChange}
+                                placeholder={formData.quantity?.toString()}
+                                className="w-32 px-3 py-1.5 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                            />
+                            <span className="text-sm text-gray-500">
+                                out of {formData.quantity} {formData.unit} available for loan
+                            </span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Consumable Toggle */}
