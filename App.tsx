@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
@@ -23,6 +21,10 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Loading UX State
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState("Initializing system...");
+
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [borrowRecords, setBorrowRecords] = useState<BorrowRecord[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -66,20 +68,29 @@ const App: React.FC = () => {
   const refreshData = React.useCallback(async (silent = false) => {
       if (!silent) setIsLoading(true);
       try {
-          const [loadedItems, loadedRecords, loadedSettings, loadedCats, loadedRequests] = await Promise.all([
+          // Step 1: Load Settings first to show branding on splash screen immediately
+          if (!silent) setLoadingStatus("Loading configuration...");
+          const loadedSettings = await storage.getSettings();
+          if (!silent) setSettings(loadedSettings);
+
+          // Step 2: Load Core Data
+          if (!silent) setLoadingStatus("Syncing inventory database...");
+          const [loadedItems, loadedRecords, loadedCats, loadedRequests] = await Promise.all([
               storage.getInventory(),
               storage.getBorrowRecords(),
-              storage.getSettings(),
               storage.getCategories(),
               storage.getBorrowRequests()
           ]);
+          
           setItems(loadedItems);
           setBorrowRecords(loadedRecords);
-          setSettings(loadedSettings);
           setCategories(loadedCats);
           setRequests(loadedRequests);
+          
+          if (!silent) setLoadingStatus("Ready");
       } catch (e) {
           console.error("Data Load Error", e);
+          if (!silent) setLoadingStatus("Connection error. Retrying...");
       } finally {
           if (!silent) setIsLoading(false);
       }
@@ -90,7 +101,14 @@ const App: React.FC = () => {
     if (auth === 'true') {
         setIsAuthenticated(true);
     }
-    refreshData();
+    
+    // Initial Load Sequence
+    refreshData(false).then(() => {
+        // Add a small delay for the splash screen to look smooth and allow branding to be read
+        setTimeout(() => {
+            setIsFirstLoad(false);
+        }, 1200);
+    });
 
     // Real-time Subscriptions
     const channels = [
@@ -213,7 +231,6 @@ const App: React.FC = () => {
       dueDate: string, 
       specificId?: string
   ) => {
-    // Borrow Modal handles its own data entry, no extra confirm needed as it is a modal itself.
     const result = await storage.borrowItem(item.id, borrowerName, borrowerId, quantity, dueDate, specificId);
     if (result.success) {
         await refreshData(true);
@@ -321,13 +338,54 @@ const App: React.FC = () => {
     setIsBorrowModalOpen(true);
   };
 
-  // Loading State
-  if (!settings) {
+  // --- ENHANCED LOADING SCREEN ---
+  if (isFirstLoad) {
       return (
-          <div className="h-screen w-screen flex items-center justify-center bg-gray-900 text-gray-200">
-              <div className="flex flex-col items-center gap-4">
-                  <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
-                  <p>Loading System...</p>
+          <div className="fixed inset-0 bg-slate-900 flex items-center justify-center z-50 overflow-hidden">
+              {/* Background Effects */}
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#0f172a] to-slate-900 animate-pulse"></div>
+              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '32px 32px' }}></div>
+              
+              {/* Glass Card */}
+              <div className="relative bg-white/5 backdrop-blur-2xl border border-white/10 p-10 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm w-full mx-4 animate-in zoom-in fade-in duration-700 slide-in-from-bottom-8">
+                  
+                  {/* Logo Container */}
+                  <div className="mb-8 relative group">
+                      <div className="absolute inset-0 bg-blue-500 blur-3xl opacity-20 rounded-full animate-pulse group-hover:opacity-30 transition-opacity"></div>
+                      <div className="relative z-10 p-5 bg-gradient-to-tr from-white/10 to-white/5 rounded-2xl border border-white/20 shadow-lg">
+                        {settings?.logoUrl ? (
+                            <img src={settings.logoUrl} alt="Logo" className="w-20 h-20 object-contain drop-shadow-md" />
+                        ) : (
+                            <FlaskConical className="w-16 h-16 text-blue-400 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)]" />
+                        )}
+                      </div>
+                  </div>
+
+                  {/* App Title */}
+                  <h1 className="text-2xl font-bold text-white mb-2 tracking-tight text-center">
+                      {settings?.appName || 'SciLab Inventory Pro'}
+                  </h1>
+                  <p className="text-blue-200/60 text-xs font-medium uppercase tracking-widest mb-10 text-center">
+                      Laboratory Management System
+                  </p>
+
+                  {/* Progress Loader */}
+                  <div className="w-full space-y-4">
+                      <div className="flex justify-between text-[10px] uppercase font-bold text-blue-200/60 font-mono px-1">
+                          <span>{loadingStatus}</span>
+                          <span className="animate-pulse">...</span>
+                      </div>
+                      <div className="h-1 w-full bg-slate-800/50 rounded-full overflow-hidden border border-white/5">
+                          <div 
+                              className={`h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-500 rounded-full transition-all duration-700 ease-out ${loadingStatus === 'Ready' ? 'w-full' : 'w-2/3 animate-[shimmer_2s_infinite_linear]'}`} 
+                              style={{ backgroundSize: '200% 100%' }}
+                          ></div>
+                      </div>
+                  </div>
+              </div>
+              
+              <div className="absolute bottom-8 text-slate-500 text-[9px] tracking-[0.2em] uppercase font-semibold opacity-60">
+                  Secure Environment
               </div>
           </div>
       );
@@ -335,28 +393,28 @@ const App: React.FC = () => {
 
   const AppBrand = () => (
       <div className="flex items-center space-x-3">
-          {settings.logoUrl ? (
+          {settings?.logoUrl ? (
               <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-lg bg-white p-0.5 border border-gray-200" />
           ) : (
               <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
                  <FlaskConical className="w-6 h-6" />
               </div>
           )}
-          <h1 className="text-xl font-bold text-gray-800 tracking-tight">{settings.appName}</h1>
+          <h1 className="text-xl font-bold text-gray-800 tracking-tight">{settings?.appName}</h1>
       </div>
   );
 
   if (!isAuthenticated) {
       return (
           <Login 
-            appName={settings.appName} 
-            logoUrl={settings.logoUrl} 
+            appName={settings?.appName || 'SciLab Inventory'} 
+            logoUrl={settings?.logoUrl} 
             backgroundImageUrl={undefined}
-            customFooterText={settings.customFooterText}
-            expectedUsername={settings.adminUsername || 'admin'}
-            expectedPassword={settings.adminPassword || 'admin123'}
-            recoveryEmail={settings.recoveryEmail}
-            settings={settings} 
+            customFooterText={settings?.customFooterText}
+            expectedUsername={settings?.adminUsername || 'admin'}
+            expectedPassword={settings?.adminPassword || 'admin123'}
+            recoveryEmail={settings?.recoveryEmail}
+            settings={settings || undefined} 
             onLogin={handleLogin}
             onPasswordReset={handlePasswordReset}
           />
@@ -391,7 +449,7 @@ const App: React.FC = () => {
           </button>
         </nav>
         <div className="p-4 border-t border-gray-100 flex-shrink-0">
-            {settings.customFooterText && <div className="text-[10px] text-gray-400 mb-4 text-center px-2 font-medium uppercase tracking-wide">{settings.customFooterText}</div>}
+            {settings?.customFooterText && <div className="text-[10px] text-gray-400 mb-4 text-center px-2 font-medium uppercase tracking-wide">{settings.customFooterText}</div>}
             <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-colors font-medium">
                 <LogOut className="w-5 h-5" /><span>Log Out</span>
             </button>
@@ -401,8 +459,8 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col overflow-hidden relative z-10">
         <header className="bg-white/95 backdrop-blur-md border-b border-gray-200 p-4 md:hidden flex justify-between items-center flex-shrink-0 sticky top-0 z-30 shadow-sm">
              <div className="flex items-center space-x-2">
-                {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded-md" /> : <div className="bg-blue-600 p-1.5 rounded-lg text-white"><FlaskConical className="w-5 h-5" /></div>}
-                <span className="font-bold truncate max-w-[150px] text-gray-800">{settings.appName}</span>
+                {settings?.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded-md" /> : <div className="bg-blue-600 p-1.5 rounded-lg text-white"><FlaskConical className="w-5 h-5" /></div>}
+                <span className="font-bold truncate max-w-[150px] text-gray-800">{settings?.appName}</span>
              </div>
              {!isMobile ? (
                 <div className="flex space-x-2">
@@ -430,7 +488,7 @@ const App: React.FC = () => {
                     {view === 'settings' && 'System Configuration'}
                     </h2>
                     <p className="text-gray-600 text-sm mt-1 font-medium">
-                        {isLoading ? 'Loading data...' : 'Manage your science assets efficiently.'}
+                        {isLoading ? 'Refreshing data...' : 'Manage your science assets efficiently.'}
                     </p>
                 </div>
                 {view === 'inventory' && !isMobile && (
@@ -444,7 +502,7 @@ const App: React.FC = () => {
             <div className="px-6 md:px-8 pb-8">
                 <div className="max-w-7xl mx-auto">
                     {isLoading && items.length === 0 ? (
-                        <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-white"/></div>
+                        <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-blue-500"/></div>
                     ) : (
                         <>
                             {view === 'dashboard' && !isMobile && <Dashboard items={items} />}
@@ -481,7 +539,7 @@ const App: React.FC = () => {
                                     onDeleteBulk={handleBulkDeleteBorrowRecords}
                                 />
                             )}
-                            {view === 'settings' && !isMobile && (
+                            {view === 'settings' && !isMobile && settings && (
                                 <Settings 
                                     settings={settings}
                                     onSave={handleSettingsSave}
