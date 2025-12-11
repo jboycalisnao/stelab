@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { InventoryItem, ItemCondition, Category } from '../types';
 import { enrichTextData } from '../services/geminiService';
@@ -63,9 +61,9 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
         description: result.description,
         safetyNotes: result.safetyNotes,
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Enrichment failed", error);
-      alert("AI Enrichment failed.");
+      alert(`AI Enrichment failed: ${error.message || "Unknown error"}`);
     } finally {
       setIsAnalyzing(false);
     }
@@ -220,7 +218,6 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                                 name="maxBorrowable"
                                 min="0"
                                 max={formData.quantity}
-                                // Use null coalescing to default to empty string if undefined OR null
                                 value={formData.maxBorrowable ?? ''}
                                 onChange={handleLimitChange}
                                 placeholder={formData.quantity?.toString()}

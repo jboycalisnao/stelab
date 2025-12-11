@@ -1,11 +1,7 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIAnalysisResult } from "../types";
 
-// Prefer process.env.API_KEY, fallback only if absolutely necessary for local dev without env vars set correctly
-const GEMINI_API_KEY = process.env.API_KEY || '';
-
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const SYSTEM_INSTRUCTION = `
 You are an expert Laboratory Manager and Science Educator for High School laboratories. 
@@ -15,8 +11,8 @@ Classify items into standard scientific categories (e.g., Chemistry, Biology, Ph
 `;
 
 export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult> => {
-  if (!GEMINI_API_KEY) {
-    console.error("Gemini API Key is missing. Please check your environment variables.");
+  if (!process.env.API_KEY) {
+    console.error("Gemini API Key is missing.");
     throw new Error("API Key is missing");
   }
 
@@ -25,10 +21,7 @@ export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: {
-          role: 'user',
-          parts: [{ text: prompt }]
-      },
+      contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
