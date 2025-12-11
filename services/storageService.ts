@@ -5,7 +5,7 @@ import { supabase } from '../supabaseClient';
 import { DEFAULT_CATEGORIES } from '../constants';
 
 // --- Metadata Helper Functions ---
-// These allow us to store new fields (maxBorrowable, isConsumable) in the existing 'description' column
+// These allow us to store new fields (maxBorrowable, isConsumable, boxes) in the existing 'description' column
 // to avoid "Column not found" errors if the database schema hasn't been updated.
 
 const METADATA_TAG = "<!--SYSTEM_META:";
@@ -30,6 +30,7 @@ const parseInventoryItem = (data: any): InventoryItem => {
                 // Merge metadata fields back into the object
                 if (meta.maxBorrowable !== undefined) item.maxBorrowable = meta.maxBorrowable;
                 if (meta.isConsumable !== undefined) item.isConsumable = meta.isConsumable;
+                if (meta.boxes !== undefined) item.boxes = meta.boxes;
                 
                 // Clean description for UI (remove the hidden tag)
                 item.description = item.description.substring(0, start).trim();
@@ -64,6 +65,13 @@ const prepareInventoryItemForSave = (item: InventoryItem): any => {
     }
     // Delete from top-level payload to avoid Schema Error
     delete payload.isConsumable;
+
+    // Extract boxes (prevent sending to DB as column)
+    if (payload.boxes && payload.boxes.length > 0) {
+        meta.boxes = payload.boxes;
+        hasMeta = true;
+    }
+    delete payload.boxes;
 
     // Embed in description as hidden metadata
     if (hasMeta) {

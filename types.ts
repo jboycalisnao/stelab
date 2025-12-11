@@ -1,5 +1,12 @@
 
 
+export interface InventoryBox {
+  id: string; // Unique Box ID (e.g. CHE-101-BOX-001)
+  label: string; // Friendly label "Box 1"
+  quantity: number; // Qty inside this box
+  status: 'Sealed' | 'Opened';
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -15,6 +22,7 @@ export interface InventoryItem {
   shortId?: string; // Unique short identifier for barcode generation (e.g., BIO-1024)
   isConsumable?: boolean;
   maxBorrowable?: number | null; // Limit the number of items available for loan (e.g. unboxed stock)
+  boxes?: InventoryBox[]; // Boxed inventory tracking
 }
 
 export enum ItemCondition {

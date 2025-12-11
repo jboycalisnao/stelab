@@ -1,7 +1,8 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { InventoryItem } from '../types';
-import { X, Printer, Copy } from 'lucide-react';
+import { X, Printer, Copy, Package } from 'lucide-react';
 
 interface QRCodeModalProps {
   item: InventoryItem;
@@ -10,6 +11,8 @@ interface QRCodeModalProps {
 
 const QRCodeModal: React.FC<QRCodeModalProps> = ({ item, onClose }) => {
   const [printQty, setPrintQty] = useState(item.quantity);
+  const [mode, setMode] = useState<'item' | 'boxes'>('item');
+
   // Public URL for the QR code
   const publicUrl = `${window.location.origin}?view_item=${item.id}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(publicUrl)}`;
@@ -94,17 +97,32 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ item, onClose }) => {
       printWindow.document.write('</style></head><body>');
       printWindow.document.write('<div class="label-grid">');
       
-      // Generate labels based on printQty
       let content = '';
-      for(let i=0; i<printQty; i++) {
-          content += `
-            <div class="label">
-                <div class="item-name">${item.name}</div>
-                <img src="${qrUrl}" class="qr-img" />
-                <div class="item-footer">${item.location}</div>
-                <div class="scan-text">Scan for Info</div>
-            </div>
-          `;
+
+      if (mode === 'item') {
+        for(let i=0; i<printQty; i++) {
+            content += `
+                <div class="label">
+                    <div class="item-name">${item.name}</div>
+                    <img src="${qrUrl}" class="qr-img" />
+                    <div class="item-footer">${item.location}</div>
+                    <div class="scan-text">Scan for Info</div>
+                </div>
+            `;
+        }
+      } else if (mode === 'boxes' && item.boxes) {
+          // Print one label for each box
+          item.boxes.forEach(box => {
+               const boxQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(box.id)}`;
+               content += `
+                <div class="label">
+                    <div class="item-name">${item.name}</div>
+                    <img src="${boxQrUrl}" class="qr-img" />
+                    <div class="item-footer">${box.label} (${box.quantity} pcs)</div>
+                    <div class="scan-text">${box.id}</div>
+                </div>
+            `;
+          });
       }
       
       printWindow.document.write(content);
@@ -114,6 +132,8 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ item, onClose }) => {
       printWindow.document.close();
     }
   };
+
+  const hasBoxes = item.boxes && item.boxes.length > 0;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -125,23 +145,58 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ item, onClose }) => {
         <div className="text-center">
           <h3 className="text-lg font-bold text-gray-800 mb-1">{item.name}</h3>
           <p className="text-sm text-gray-500 mb-4">{item.category} • {item.location}</p>
+
+          {/* Mode Switcher */}
+          {hasBoxes && (
+              <div className="flex bg-gray-100 rounded-lg p-1 mb-4">
+                  <button 
+                    onClick={() => setMode('item')}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'item' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}
+                  >
+                      Public Info QR
+                  </button>
+                  <button 
+                    onClick={() => setMode('boxes')}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'boxes' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}
+                  >
+                      Box Labels ({item.boxes!.length})
+                  </button>
+              </div>
+          )}
           
           <div className="bg-white p-4 rounded-lg inline-block mb-4 border border-gray-100 shadow-inner">
-            <img src={qrUrl} alt="Item QR Code" className="w-40 h-40 mix-blend-multiply" />
-            <p className="text-[10px] text-gray-400 mt-2 font-mono">Scans to public info page</p>
+            {mode === 'item' ? (
+                <>
+                    <img src={qrUrl} alt="Item QR Code" className="w-40 h-40 mix-blend-multiply" />
+                    <p className="text-[10px] text-gray-400 mt-2 font-mono">Scans to public info page</p>
+                </>
+            ) : (
+                <div className="w-40 h-40 flex flex-col items-center justify-center text-gray-400 bg-gray-50">
+                    <Package className="w-10 h-10 mb-2" />
+                    <p className="text-xs">Preview on Print</p>
+                </div>
+            )}
           </div>
 
           {/* Bulk Settings */}
-          <div className="flex items-center justify-center gap-2 mb-6">
-              <label className="text-sm text-gray-600 font-medium">Print Copies:</label>
-              <input 
-                type="number" 
-                min="1" 
-                value={printQty}
-                onChange={(e) => setPrintQty(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-16 border border-gray-300 rounded px-2 py-1 text-center text-sm"
-              />
-          </div>
+          {mode === 'item' && (
+            <div className="flex items-center justify-center gap-2 mb-6">
+                <label className="text-sm text-gray-600 font-medium">Print Copies:</label>
+                <input 
+                    type="number" 
+                    min="1" 
+                    value={printQty}
+                    onChange={(e) => setPrintQty(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-16 border border-gray-300 rounded px-2 py-1 text-center text-sm"
+                />
+            </div>
+          )}
+
+          {mode === 'boxes' && (
+              <p className="text-xs text-gray-500 mb-6">
+                  Will print {item.boxes!.length} unique labels for each box in inventory.
+              </p>
+          )}
 
           <button
             onClick={handlePrint}

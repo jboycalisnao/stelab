@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
@@ -258,6 +260,20 @@ const App: React.FC = () => {
           setReturnModalState({ isOpen: false });
       } else {
           alert(result.message || "Failed to return item.");
+      }
+  };
+
+  const handleUnbox = async (item: InventoryItem, boxId: string) => {
+      if (!item.boxes) return;
+      
+      const updatedBoxes = item.boxes.map(b => b.id === boxId ? { ...b, status: 'Opened' as const } : b);
+      const updatedItem = { ...item, boxes: updatedBoxes };
+      
+      const result = await storage.saveItem(updatedItem);
+      if (result.success) {
+          await refreshData(true);
+      } else {
+          alert("Failed to unbox: " + result.message);
       }
   };
 
@@ -527,6 +543,7 @@ const App: React.FC = () => {
                                     borrowRecords={borrowRecords}
                                     onBorrow={openBorrowModal}
                                     onReturn={initiateReturn}
+                                    onUnbox={handleUnbox}
                                 />
                             )}
                             {view === 'lending' && !isMobile && (
