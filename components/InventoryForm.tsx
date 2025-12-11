@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { InventoryItem, ItemCondition, Category } from '../types';
-import { enrichTextData } from '../services/geminiService';
-import { Loader2, Sparkles, X, Box, Lock } from 'lucide-react';
+import { X, Box, Lock } from 'lucide-react';
 
 interface InventoryFormProps {
   initialData?: InventoryItem;
@@ -31,7 +30,6 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
   // Check if maxBorrowable has a valid value (including 0)
   const hasLimit = initialData?.maxBorrowable !== undefined && initialData?.maxBorrowable !== null;
   const [useBorrowLimit, setUseBorrowLimit] = useState<boolean>(hasLimit);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -45,28 +43,6 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
   const handleLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = parseInt(e.target.value);
       setFormData(prev => ({ ...prev, maxBorrowable: isNaN(val) ? undefined : val }));
-  };
-
-  const handleSmartEnrich = async () => {
-    if (!formData.name) {
-      alert("Please enter an item name first.");
-      return;
-    }
-    setIsAnalyzing(true);
-    try {
-      const result = await enrichTextData(formData.name);
-      setFormData(prev => ({
-        ...prev,
-        category: result.category,
-        description: result.description,
-        safetyNotes: result.safetyNotes,
-      }));
-    } catch (error: any) {
-      console.error("Enrichment failed", error);
-      alert(`AI Enrichment failed: ${error.message || "Unknown error"}`);
-    } finally {
-      setIsAnalyzing(false);
-    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -109,27 +85,15 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
             {/* Name Row */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Item Name *</label>
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400 shadow-sm bg-white"
-                  placeholder="e.g. Bunsen Burner"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={handleSmartEnrich}
-                  disabled={isAnalyzing || !formData.name}
-                  className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 disabled:opacity-50 transition-colors flex items-center gap-2 font-medium text-sm border border-purple-200 shadow-sm"
-                  title="Auto-fill details using AI"
-                >
-                  {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  <span>Auto-Fill</span>
-                </button>
-              </div>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400 shadow-sm bg-white"
+                placeholder="e.g. Bunsen Burner"
+                required
+              />
             </div>
 
             {/* Grid for details */}

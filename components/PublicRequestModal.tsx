@@ -1,9 +1,7 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, BorrowRequest, RequestItem } from '../types';
 import * as storage from '../services/storageService';
-import { X, Search, ShoppingBag, Plus, Trash2, ArrowRight, ArrowLeft, CheckCircle, QrCode } from 'lucide-react';
+import { X, Search, ShoppingBag, Plus, Trash2, ArrowRight, ArrowLeft, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { getCategoryIcon, getCategoryColor } from '../constants';
 
 interface PublicRequestModalProps {
@@ -22,6 +20,9 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
   const [returnDate, setReturnDate] = useState('');
   const [selectedItems, setSelectedItems] = useState<RequestItem[]>([]);
   
+  // UI State for Step 2
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
   // Result State
   const [createdRequest, setCreatedRequest] = useState<BorrowRequest | null>(null);
 
@@ -48,6 +49,33 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
           i.category.toLowerCase().includes(searchTerm.toLowerCase())
       );
   }, [items, searchTerm]);
+
+  // Group filtered items by category
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, InventoryItem[]> = {};
+    filteredInventory.forEach(item => {
+        if (!groups[item.category]) groups[item.category] = [];
+        groups[item.category].push(item);
+    });
+    return groups;
+  }, [filteredInventory]);
+
+  // Auto-expand on search
+  useEffect(() => {
+    if (searchTerm.trim().length > 0) {
+        setExpandedCategories(new Set(Object.keys(groupedItems)));
+    }
+  }, [searchTerm, groupedItems]);
+
+  const toggleCategory = (category: string) => {
+    const newSet = new Set(expandedCategories);
+    if (newSet.has(category)) {
+        newSet.delete(category);
+    } else {
+        newSet.add(category);
+    }
+    setExpandedCategories(newSet);
+  };
 
   const getAvailableQty = (item: InventoryItem) => {
       const hasLimit = item.maxBorrowable !== undefined && item.maxBorrowable !== null;
@@ -165,29 +193,62 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                          </div>
                          <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                             {filteredInventory.map(item => {
-                                 const available = getAvailableQty(item);
-                                 const inCart = selectedItems.find(p => p.itemId === item.id)?.quantity || 0;
-                                 const canAdd = inCart < available;
+                             {Object.keys(groupedItems).length === 0 && (
+                                 <div className="flex flex-col items-center justify-center h-32 text-gray-400">
+                                     <p>No available equipment found.</p>
+                                 </div>
+                             )}
 
+                             {Object.keys(groupedItems).sort().map(category => {
+                                 const catItems = groupedItems[category];
+                                 const isExpanded = expandedCategories.has(category);
+                                 const categoryColor = getCategoryColor(category);
+                                 
                                  return (
-                                     <div key={item.id} className="bg-white p-3 rounded-lg border shadow-sm flex justify-between items-center group hover:border-maroon-300 transition-all">
-                                         <div className="flex items-center gap-3">
-                                             <div className="p-2 bg-gray-100 rounded-lg text-gray-600 group-hover:bg-maroon-50 group-hover:text-maroon-600 transition-colors">
-                                                {getCategoryIcon(item.category)}
-                                             </div>
-                                             <div>
-                                                 <h4 className="font-bold text-gray-800">{item.name}</h4>
-                                                 <p className="text-xs text-gray-500">{item.category} • {available} avail</p>
-                                             </div>
-                                         </div>
-                                         <button 
-                                            onClick={() => addItem(item)} 
-                                            disabled={!canAdd}
-                                            className={`p-2 rounded-full transition-colors ${canAdd ? 'bg-maroon-100 text-maroon-600 hover:bg-maroon-200' : 'bg-gray-100 text-gray-300 cursor-not-allowed'}`}
+                                     <div key={category} className="bg-white rounded-lg border shadow-sm overflow-hidden mb-2">
+                                         <div 
+                                            onClick={() => toggleCategory(category)}
+                                            className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50 select-none"
                                          >
-                                             <Plus className="w-4 h-4" />
-                                         </button>
+                                            <div className="flex items-center gap-3">
+                                                <div 
+                                                    className="p-2 rounded-lg border shadow-sm"
+                                                    style={{ backgroundColor: `${categoryColor}15`, borderColor: `${categoryColor}30`, color: categoryColor }}
+                                                >
+                                                   {getCategoryIcon(category)}
+                                                </div>
+                                                <span className="font-bold text-gray-800">{category} ({catItems.length})</span>
+                                            </div>
+                                            {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+                                         </div>
+
+                                         {isExpanded && (
+                                             <div className="border-t bg-gray-50/50 p-2 space-y-2">
+                                                 {catItems.map(item => {
+                                                     const available = getAvailableQty(item);
+                                                     const inCart = selectedItems.find(p => p.itemId === item.id)?.quantity || 0;
+                                                     const canAdd = inCart < available;
+
+                                                     return (
+                                                         <div key={item.id} className="bg-white p-3 rounded-lg border shadow-sm flex justify-between items-center group hover:border-maroon-300 transition-all">
+                                                             <div className="flex items-center gap-3">
+                                                                 <div>
+                                                                     <h4 className="font-bold text-gray-800 text-sm">{item.name}</h4>
+                                                                     <p className="text-xs text-gray-500">{available} units available</p>
+                                                                 </div>
+                                                             </div>
+                                                             <button 
+                                                                onClick={() => addItem(item)} 
+                                                                disabled={!canAdd}
+                                                                className={`p-2 rounded-full transition-colors ${canAdd ? 'bg-maroon-100 text-maroon-600 hover:bg-maroon-200' : 'bg-gray-100 text-gray-300 cursor-not-allowed'}`}
+                                                             >
+                                                                 <Plus className="w-4 h-4" />
+                                                             </button>
+                                                         </div>
+                                                     );
+                                                 })}
+                                             </div>
+                                         )}
                                      </div>
                                  );
                              })}
@@ -206,14 +267,14 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                             ) : (
                                 selectedItems.map(p => (
                                     <div key={p.itemId} className="flex justify-between items-center text-sm">
-                                        <div className="truncate flex-1 font-medium text-gray-700">{p.itemName}</div>
+                                        <div className="truncate flex-1 font-medium text-gray-700 pr-2" title={p.itemName}>{p.itemName}</div>
                                         <div className="flex items-center gap-2">
                                             <input 
                                                 type="number" 
                                                 min="1" 
                                                 value={p.quantity} 
                                                 onChange={(e) => updateItemQty(p.itemId, parseInt(e.target.value))}
-                                                className="w-12 px-1 py-0.5 border rounded text-center"
+                                                className="w-12 px-1 py-0.5 border rounded text-center text-xs"
                                             />
                                             <button onClick={() => removeItem(p.itemId)} className="text-red-400 hover:text-red-600">
                                                 <Trash2 className="w-4 h-4" />
