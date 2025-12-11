@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
@@ -182,10 +183,14 @@ const App: React.FC = () => {
   };
 
   const handleSave = async (item: InventoryItem) => {
-    await storage.saveItem(item);
-    await refreshData(true);
-    setIsFormOpen(false);
-    setEditingItem(undefined);
+    const result = await storage.saveItem(item);
+    if (result.success) {
+        await refreshData(true);
+        setIsFormOpen(false);
+        setEditingItem(undefined);
+    } else {
+        alert("Error saving item: " + (result.message || "Unknown error"));
+    }
   };
 
   const handleDelete = async (id: string) => {

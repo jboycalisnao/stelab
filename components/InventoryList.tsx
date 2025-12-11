@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { InventoryItem, ItemCondition, Category } from '../types';
 import { Edit2, Trash2, QrCode, Search, Filter, HandPlatter, Barcode, FileText, List, Printer, AlertTriangle, CheckCircle, XCircle, Clipboard } from 'lucide-react';
@@ -326,9 +327,12 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
                     {filteredItems.length > 0 ? filteredItems.map((item) => {
-                        const borrowLimit = item.maxBorrowable !== undefined ? item.maxBorrowable : item.quantity;
+                        // Check strict inequality to null/undefined to properly respect 0 or defined values
+                        const hasLimit = item.maxBorrowable !== undefined && item.maxBorrowable !== null;
+                        const borrowLimit = hasLimit ? item.maxBorrowable! : item.quantity;
+                        
                         const available = Math.max(0, borrowLimit - (item.borrowedQuantity || 0));
-                        const isRestricted = item.maxBorrowable !== undefined && item.maxBorrowable < item.quantity;
+                        const isRestricted = hasLimit && borrowLimit < item.quantity;
 
                         return (
                         <tr key={item.id} className="hover:bg-gray-50 transition-colors group">

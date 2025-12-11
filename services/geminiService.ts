@@ -1,7 +1,9 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIAnalysisResult } from "../types";
 
-const GEMINI_API_KEY = process.env.API_KEY || 'AIzaSyDnTjbL0XCdV4XbuBR5MhOP5sd1hssQI0s';
+// Prefer process.env.API_KEY, fallback only if absolutely necessary for local dev without env vars set correctly
+const GEMINI_API_KEY = process.env.API_KEY || '';
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
@@ -14,6 +16,7 @@ Classify items into standard scientific categories (e.g., Chemistry, Biology, Ph
 
 export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult> => {
   if (!GEMINI_API_KEY) {
+    console.error("Gemini API Key is missing. Please check your environment variables.");
     throw new Error("API Key is missing");
   }
 
@@ -22,7 +25,10 @@ export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt,
+      contents: {
+          role: 'user',
+          parts: [{ text: prompt }]
+      },
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
@@ -40,7 +46,19 @@ export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as AIAnalysisResult;
+        let jsonStr = response.text.trim();
+        
+        // Sanitize: Remove markdown code blocks if present (e.g., ```json ... ```)
+        if (jsonStr.startsWith('```')) {
+            jsonStr = jsonStr.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '');
+        }
+
+        try {
+            return JSON.parse(jsonStr) as AIAnalysisResult;
+        } catch (parseError) {
+            console.error("Failed to parse Gemini JSON response:", jsonStr);
+            throw new Error("Invalid JSON response from AI");
+        }
     }
     throw new Error("No response text from Gemini");
 

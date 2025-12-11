@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, BorrowRequest, RequestItem } from '../types';
 import * as storage from '../services/storageService';
@@ -32,7 +34,8 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
     const data = await storage.getInventory();
     // Filter items that have available stock based on borrow limits
     const availableItems = data.filter(i => {
-        const limit = i.maxBorrowable !== undefined ? i.maxBorrowable : i.quantity;
+        const hasLimit = i.maxBorrowable !== undefined && i.maxBorrowable !== null;
+        const limit = hasLimit ? i.maxBorrowable! : i.quantity;
         return (limit - (i.borrowedQuantity || 0)) > 0;
     });
     setItems(availableItems);
@@ -47,7 +50,8 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
   }, [items, searchTerm]);
 
   const getAvailableQty = (item: InventoryItem) => {
-      const limit = item.maxBorrowable !== undefined ? item.maxBorrowable : item.quantity;
+      const hasLimit = item.maxBorrowable !== undefined && item.maxBorrowable !== null;
+      const limit = hasLimit ? item.maxBorrowable! : item.quantity;
       return Math.max(0, limit - (item.borrowedQuantity || 0));
   };
 

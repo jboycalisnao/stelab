@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { InventoryItem } from '../types';
 import { X, HandPlatter, Search, Tag, Lock } from 'lucide-react';
@@ -31,9 +33,11 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
   const selectedItem = availableItems.find(i => i.id === selectedItemId);
   
   // Calculate availability based on borrow limit if it exists
-  const borrowLimit = selectedItem ? (selectedItem.maxBorrowable !== undefined ? selectedItem.maxBorrowable : selectedItem.quantity) : 0;
+  const hasLimit = selectedItem && selectedItem.maxBorrowable !== undefined && selectedItem.maxBorrowable !== null;
+  const borrowLimit = selectedItem ? (hasLimit ? selectedItem.maxBorrowable! : selectedItem.quantity) : 0;
+  
   const available = selectedItem ? Math.max(0, borrowLimit - (selectedItem.borrowedQuantity || 0)) : 0;
-  const isRestricted = selectedItem && selectedItem.maxBorrowable !== undefined && selectedItem.maxBorrowable < selectedItem.quantity;
+  const isRestricted = hasLimit && selectedItem && borrowLimit < selectedItem.quantity;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +51,8 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
 
   // Filter items that have available stock for borrowing
   const stockItems = availableItems.filter(i => {
-      const limit = i.maxBorrowable !== undefined ? i.maxBorrowable : i.quantity;
+      const hLimit = i.maxBorrowable !== undefined && i.maxBorrowable !== null;
+      const limit = hLimit ? i.maxBorrowable! : i.quantity;
       return (limit - (i.borrowedQuantity || 0)) > 0;
   });
 
@@ -104,7 +109,8 @@ const BorrowModal: React.FC<BorrowModalProps> = ({ availableItems, initialItem, 
                     >
                         <option value="" disabled className="text-gray-500">Select Equipment...</option>
                         {stockItems.map(item => {
-                            const limit = item.maxBorrowable !== undefined ? item.maxBorrowable : item.quantity;
+                            const hL = item.maxBorrowable !== undefined && item.maxBorrowable !== null;
+                            const limit = hL ? item.maxBorrowable! : item.quantity;
                             const avail = Math.max(0, limit - (item.borrowedQuantity || 0));
                             return (
                                 <option key={item.id} value={item.id} className="text-gray-900">

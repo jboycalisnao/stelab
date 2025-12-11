@@ -4,13 +4,84 @@ import { InventoryItem, BorrowRecord, AppSettings, Category, ItemCondition, Audi
 import { supabase } from '../supabaseClient';
 import { DEFAULT_CATEGORIES } from '../constants';
 
+// --- Metadata Helper Functions ---
+// These allow us to store new fields (maxBorrowable, isConsumable) in the existing 'description' column
+// to avoid "Column not found" errors if the database schema hasn't been updated.
+
+const METADATA_TAG = "<!--SYSTEM_META:";
+const METADATA_END = "-->";
+
+const parseInventoryItem = (data: any): InventoryItem => {
+    if (!data) return data;
+    
+    // Create a copy
+    let item: InventoryItem = { ...data };
+
+    // Unpack metadata from description if present
+    if (item.description && item.description.includes(METADATA_TAG)) {
+        const start = item.description.indexOf(METADATA_TAG);
+        const end = item.description.indexOf(METADATA_END, start);
+        
+        if (start !== -1 && end !== -1) {
+            try {
+                const jsonStr = item.description.substring(start + METADATA_TAG.length, end);
+                const meta = JSON.parse(jsonStr);
+                
+                // Merge metadata fields back into the object
+                if (meta.maxBorrowable !== undefined) item.maxBorrowable = meta.maxBorrowable;
+                if (meta.isConsumable !== undefined) item.isConsumable = meta.isConsumable;
+                
+                // Clean description for UI (remove the hidden tag)
+                item.description = item.description.substring(0, start).trim();
+            } catch (e) {
+                console.warn("Metadata parse error", e);
+            }
+        }
+    }
+    
+    return item;
+};
+
+const prepareInventoryItemForSave = (item: InventoryItem): any => {
+    // Clone to avoid mutating the UI object
+    const payload: any = { ...item };
+    
+    const meta: any = {};
+    let hasMeta = false;
+    
+    // Extract maxBorrowable (prevent sending to DB as column)
+    if (payload.maxBorrowable !== undefined && payload.maxBorrowable !== null) {
+        meta.maxBorrowable = payload.maxBorrowable;
+        hasMeta = true;
+    }
+    // Delete from top-level payload to avoid Schema Error
+    delete payload.maxBorrowable;
+
+    // Extract isConsumable (prevent sending to DB as column)
+    if (payload.isConsumable) {
+        meta.isConsumable = payload.isConsumable;
+        hasMeta = true;
+    }
+    // Delete from top-level payload to avoid Schema Error
+    delete payload.isConsumable;
+
+    // Embed in description as hidden metadata
+    if (hasMeta) {
+        // We append it to the description so it persists in a standard text column
+        payload.description = (payload.description || '').trim() + `\n\n${METADATA_TAG}${JSON.stringify(meta)}${METADATA_END}`;
+    }
+
+    return payload;
+};
+
 // --- Inventory ---
 
 export const getInventory = async (): Promise<InventoryItem[]> => {
     try {
         const { data, error } = await supabase.from('inventory_items').select('*');
         if (error) throw error;
-        return data as InventoryItem[];
+        // Parse metadata for every item
+        return (data || []).map(parseInventoryItem);
     } catch (error: any) {
         console.error('Supabase Error (getInventory):', error.message);
         return [];
@@ -21,14 +92,14 @@ export const getInventoryItem = async (id: string): Promise<InventoryItem | null
     try {
         const { data, error } = await supabase.from('inventory_items').select('*').eq('id', id).single();
         if (error) throw error;
-        return data as InventoryItem;
+        return parseInventoryItem(data);
     } catch (error: any) {
         console.error('Supabase Error (getInventoryItem):', error.message);
         return null;
     }
 };
 
-export const saveItem = async (item: InventoryItem): Promise<boolean> => {
+export const saveItem = async (item: InventoryItem): Promise<{ success: boolean; message?: string }> => {
     // Generate Short ID if missing
     if (!item.shortId) {
          const prefix = item.category.substring(0, 3).toUpperCase();
@@ -42,12 +113,15 @@ export const saveItem = async (item: InventoryItem): Promise<boolean> => {
     item.lastUpdated = new Date().toISOString();
 
     try {
-        const { error } = await supabase.from('inventory_items').upsert(item);
+        // Prepare payload (packs extra fields into description to prevent column errors)
+        const payload = prepareInventoryItemForSave(item);
+        
+        const { error } = await supabase.from('inventory_items').upsert(payload);
         if (error) throw error;
-        return true;
+        return { success: true };
     } catch (error: any) {
         console.error('Supabase Error (saveItem):', error.message);
-        return false;
+        return { success: false, message: error.message };
     }
 };
 
@@ -116,11 +190,6 @@ export const borrowItem = async (
 const updateRequestStatusByLinkedRecord = async (recordId: string) => {
     // Check if this record belongs to a Request. If so, check if all items in that request are returned.
     try {
-        // 1. Find the request containing this recordId
-        // Since we store items as JSON, we need to search within the JSON array
-        // Better approach: fetch requests where status is Approved or Released
-        // and scan their items in JS since we can't easily perform "contains item with linkedRecordId=X" in standard PostgREST without specific JSON operators.
-        
         const { data: activeRequests } = await supabase
             .from('borrow_requests')
             .select('*')
@@ -188,22 +257,20 @@ export const returnItem = async (
         }
 
         // 2. Fetch the Inventory Item
-        const { data: item, error: itemError } = await supabase
+        const { data: rawItem, error: itemError } = await supabase
             .from('inventory_items')
             .select('*')
             .eq('id', itemId)
             .single();
 
-        if (itemError || !item) throw new Error("Item not found");
+        if (itemError || !rawItem) throw new Error("Item not found");
+        const item = parseInventoryItem(rawItem);
 
         // 3. Calculate Updates
         // borrowedQuantity decreases by the TOTAL borrowed amount (since they are processed)
         const newBorrowedQty = Math.max(0, item.borrowedQuantity - totalQty);
         
         // Total Quantity decreases by Disposed and Defective (Condemned) amounts
-        // We assume 'Defective' returns are removed from the active stock or need repair (not immediately available)
-        // For simplicity based on prompt: "input defects" -> likely implies removing them from 'Good' pool.
-        // If the user wants to keep them, they should ideally be moved to a different category, but here we just decrement main stock.
         const removedFromStock = qtyDisposed + qtyDefective;
         const newTotalQty = Math.max(0, item.quantity - removedFromStock);
 
@@ -232,7 +299,7 @@ export const returnItem = async (
 
         if (updateRecError) throw updateRecError;
 
-        // C. Sync Request Status (Fire and forget, don't block return)
+        // C. Sync Request Status (Fire and forget)
         updateRequestStatusByLinkedRecord(recordId);
 
         return { success: true };
@@ -269,7 +336,6 @@ export const deleteBorrowRecord = async (recordId: string): Promise<{ success: b
         if (fetchError || !record) throw new Error("Record not found");
 
         // 2. If it is an ACTIVE loan ('Borrowed'), we must restore the borrowedQuantity in inventory
-        // effectively treating it as cancelled/undone to avoid "phantom" borrowed items.
         if (record.status === 'Borrowed') {
              const { data: item, error: itemError } = await supabase
                 .from('inventory_items')
@@ -334,7 +400,6 @@ export const getBorrowRequests = async (): Promise<BorrowRequest[]> => {
     try {
         const { data, error } = await supabase.from('borrow_requests').select('*');
         if (error) throw error;
-        // Parse items JSON if supabase returns string, though the JS client usually handles JSONB
         return data as BorrowRequest[];
     } catch (error: any) {
         console.error('Supabase Error (getBorrowRequests):', error.message);
@@ -400,8 +465,11 @@ export const processApprovedRequest = async (request: BorrowRequest): Promise<{ 
     try {
         // 1. Verify items are still available
         for (const reqItem of request.items) {
-             const { data: invItem } = await supabase.from('inventory_items').select('*').eq('id', reqItem.itemId).single();
-             if (!invItem) throw new Error(`Item ${reqItem.itemName} not found.`);
+             const { data: rawItem } = await supabase.from('inventory_items').select('*').eq('id', reqItem.itemId).single();
+             if (!rawItem) throw new Error(`Item ${reqItem.itemName} not found.`);
+             
+             // We don't need full metadata parse here, just basic quantity check
+             const invItem = rawItem as InventoryItem;
              const available = invItem.quantity - (invItem.borrowedQuantity || 0);
              if (available < reqItem.quantity) {
                  throw new Error(`Insufficient stock for ${reqItem.itemName}. Available: ${available}, Requested: ${reqItem.quantity}`);
@@ -409,7 +477,6 @@ export const processApprovedRequest = async (request: BorrowRequest): Promise<{ 
         }
 
         // 2. Process each item (Call borrowItem transaction for each)
-        // We do this sequentially to ensure safety and capture IDs
         const updatedItems = [...request.items];
 
         for (let i = 0; i < updatedItems.length; i++) {
@@ -424,14 +491,12 @@ export const processApprovedRequest = async (request: BorrowRequest): Promise<{ 
             
             if (!result.success) throw new Error(`Failed to process ${reqItem.itemName}: ${result.message}`);
             
-            // Link the created record ID to the request item
             if (result.recordId) {
                 updatedItems[i] = { ...reqItem, linkedRecordId: result.recordId };
             }
         }
 
         // 3. Update Request Status AND update the items with linked IDs
-        // This effectively saves the "link" between request and borrow records
         const { error } = await supabase.from('borrow_requests').update({ 
             status: 'Approved',
             items: updatedItems // Save updated JSON with linkedRecordIds
@@ -453,8 +518,7 @@ export const getSettings = async (): Promise<AppSettings> => {
     try {
         const { data, error } = await supabase.from('app_settings').select('*').single();
         if (error) {
-            // If no settings exist yet, return defaults but don't crash
-            if (error.code === 'PGRST116') { // code for no rows found
+            if (error.code === 'PGRST116') {
                  return { appName: 'STE Laboratory Inventory System' };
             }
             throw error;
@@ -468,7 +532,6 @@ export const getSettings = async (): Promise<AppSettings> => {
 
 export const saveSettings = async (settings: AppSettings): Promise<boolean> => {
     try {
-        // Always update row 1
         const { error } = await supabase.from('app_settings').upsert({ ...settings, id: 1 });
         if (error) throw error;
         return true;
@@ -486,7 +549,6 @@ export const getCategories = async (): Promise<Category[]> => {
         if (error) throw error;
         
         if (!data || data.length === 0) {
-            // Fallback initialization if table is empty
             const defaults = DEFAULT_CATEGORIES.map(name => ({
                 id: name.toLowerCase().replace(/\s+/g, '-'),
                 name,

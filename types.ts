@@ -14,7 +14,7 @@ export interface InventoryItem {
   lastUpdated: string;
   shortId?: string; // Unique short identifier for barcode generation (e.g., BIO-1024)
   isConsumable?: boolean;
-  maxBorrowable?: number; // Limit the number of items available for loan (e.g. unboxed stock)
+  maxBorrowable?: number | null; // Limit the number of items available for loan (e.g. unboxed stock)
 }
 
 export enum ItemCondition {

@@ -1,3 +1,5 @@
+
+
 import React, { useState } from 'react';
 import { InventoryItem, ItemCondition, Category } from '../types';
 import { enrichTextData } from '../services/geminiService';
@@ -28,7 +30,9 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
     }
   );
 
-  const [useBorrowLimit, setUseBorrowLimit] = useState<boolean>(!!initialData?.maxBorrowable);
+  // Check if maxBorrowable has a valid value (including 0)
+  const hasLimit = initialData?.maxBorrowable !== undefined && initialData?.maxBorrowable !== null;
+  const [useBorrowLimit, setUseBorrowLimit] = useState<boolean>(hasLimit);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -76,9 +80,11 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
     
     // Logic check: Max borrowable shouldn't exceed total quantity
     const finalData = { ...formData };
+    
     if (!useBorrowLimit) {
-        finalData.maxBorrowable = undefined;
-    } else if (finalData.maxBorrowable !== undefined && finalData.quantity !== undefined) {
+        // Explicitly set to null to indicate clearing the limit in the DB
+        finalData.maxBorrowable = null;
+    } else if (finalData.maxBorrowable !== undefined && finalData.maxBorrowable !== null && finalData.quantity !== undefined) {
         if (finalData.maxBorrowable > finalData.quantity) {
              alert("Borrow limit cannot be higher than total quantity.");
              return;
@@ -214,7 +220,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                                 name="maxBorrowable"
                                 min="0"
                                 max={formData.quantity}
-                                value={formData.maxBorrowable || ''}
+                                value={formData.maxBorrowable !== undefined ? formData.maxBorrowable : ''}
                                 onChange={handleLimitChange}
                                 placeholder={formData.quantity?.toString()}
                                 className="w-32 px-3 py-1.5 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
