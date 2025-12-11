@@ -43,7 +43,36 @@ export const isSupabaseConfigured = !!(supabaseUrl && supabaseKey);
 if (!isSupabaseConfigured) {
   console.error("CRITICAL: Supabase credentials missing. App will not function correctly.");
 } else {
-  console.log("Supabase Client Initialized with URL:", supabaseUrl);
+  // Only log if using fallback to help debugging
+  if (!envUrl) console.log("Using Fallback Supabase Credentials");
+  else console.log("Supabase Client Initialized with URL:", supabaseUrl);
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Safely create client, fallback to a dummy client if URL is missing to prevent crash
+let client;
+try {
+    if (supabaseUrl && supabaseKey) {
+        client = createClient(supabaseUrl, supabaseKey);
+    } else {
+        throw new Error("Missing URL or Key");
+    }
+} catch (e) {
+    console.error("Failed to initialize Supabase client:", e);
+    // Dummy client to prevent immediate crash on property access
+    client = {
+        from: () => ({
+            select: () => ({ data: null, error: { message: "Supabase not configured" } }),
+            insert: () => ({ error: { message: "Supabase not configured" } }),
+            update: () => ({ error: { message: "Supabase not configured" } }),
+            delete: () => ({ error: { message: "Supabase not configured" } }),
+            upsert: () => ({ error: { message: "Supabase not configured" } }),
+        }),
+        rpc: () => ({ data: null, error: { message: "Supabase not configured" } }),
+        channel: () => ({
+            on: () => ({ subscribe: () => {} })
+        }),
+        removeChannel: () => {}
+    } as any;
+}
+
+export const supabase = client;

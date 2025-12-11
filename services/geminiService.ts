@@ -1,7 +1,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIAnalysisResult } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Safely retrieve API Key to prevent runtime crashes if process is undefined
+const getApiKey = () => {
+  try {
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env.API_KEY;
+    }
+  } catch (e) {
+    console.warn("Failed to access process.env");
+  }
+  return "";
+};
+
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 const SYSTEM_INSTRUCTION = `
 You are an expert Laboratory Manager and Science Educator for High School laboratories. 
@@ -11,7 +24,8 @@ Classify items into standard scientific categories (e.g., Chemistry, Biology, Ph
 `;
 
 export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult> => {
-  if (!process.env.API_KEY) {
+  const key = getApiKey();
+  if (!key) {
     console.error("Gemini API Key is missing.");
     throw new Error("API Key is missing");
   }
