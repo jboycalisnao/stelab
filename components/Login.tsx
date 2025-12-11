@@ -1,8 +1,11 @@
+
+
 import React, { useState, useEffect } from 'react';
-import { FlaskConical, Lock, User, AlertCircle, Eye, EyeOff, Mail, ArrowRight, ArrowLeft, KeyRound, Loader2, Send, ShoppingBag, Search, QrCode } from 'lucide-react';
-import { AppSettings, BorrowRequest } from '../types';
+import { FlaskConical, Lock, User, AlertCircle, Eye, EyeOff, Mail, ArrowRight, ArrowLeft, KeyRound, Loader2, Send, ShoppingBag, Search, QrCode, MapPin, Activity, Box, Tag } from 'lucide-react';
+import { AppSettings, BorrowRequest, InventoryItem } from '../types';
 import * as storage from '../services/storageService';
 import PublicRequestModal from './PublicRequestModal';
+import { getCategoryColor, getCategoryIcon } from '../constants';
 
 // Declare EmailJS global
 declare global {
@@ -36,8 +39,8 @@ const Login: React.FC<LoginProps> = ({
     onLogin,
     onPasswordReset
 }) => {
-  // Mode: 'landing' | 'admin' | 'reset'
-  const [viewMode, setViewMode] = useState<'landing' | 'admin' | 'reset'>('landing');
+  // Mode: 'landing' | 'admin' | 'reset' | 'item_view'
+  const [viewMode, setViewMode] = useState<'landing' | 'admin' | 'reset' | 'item_view'>('landing');
 
   // Login State
   const [username, setUsername] = useState('');
@@ -51,6 +54,10 @@ const Login: React.FC<LoginProps> = ({
   const [trackResult, setTrackResult] = useState<BorrowRequest | null | 'not_found'>(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
 
+  // Item View State
+  const [publicItem, setPublicItem] = useState<InventoryItem | null>(null);
+  const [isItemLoading, setIsItemLoading] = useState(false);
+
   // Forgot Password State
   const [resetStep, setResetStep] = useState<1 | 2 | 3>(1);
   const [inputEmail, setInputEmail] = useState('');
@@ -62,16 +69,28 @@ const Login: React.FC<LoginProps> = ({
   const [resetSuccess, setResetSuccess] = useState('');
   const [isSendingOtp, setIsSendingOtp] = useState(false);
 
-  // Check URL for reference code on mount
+  // Check URL for reference code or item ID on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
-    if (ref) {
+    const viewItem = params.get('view_item');
+
+    if (viewItem) {
+        setViewMode('item_view');
+        loadPublicItem(viewItem);
+    } else if (ref) {
         setTrackCode(ref);
         // Automatically trigger search
         handleTrackRequest(undefined, ref);
     }
   }, []);
+
+  const loadPublicItem = async (id: string) => {
+      setIsItemLoading(true);
+      const item = await storage.getInventoryItem(id);
+      setPublicItem(item);
+      setIsItemLoading(false);
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -262,6 +281,119 @@ const Login: React.FC<LoginProps> = ({
                         <Lock className="w-3 h-3" /> Lab Admin Access
                     </button>
                 </div>
+            </div>
+        )}
+
+        {viewMode === 'item_view' && (
+            <div className="flex-1 flex flex-col p-8 md:p-12 animate-in fade-in zoom-in duration-300">
+                 <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col">
+                    <button onClick={() => { setViewMode('landing'); window.history.replaceState({}, '', window.location.pathname); }} className="text-gray-400 hover:text-gray-600 flex items-center gap-2 text-sm transition-colors mb-6 w-fit">
+                        <ArrowLeft className="w-4 h-4" /> Back to Portal
+                    </button>
+
+                    {isItemLoading ? (
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                            <Loader2 className="w-12 h-12 text-maroon-600 animate-spin mb-4" />
+                            <p className="text-gray-500">Loading Equipment Details...</p>
+                        </div>
+                    ) : publicItem ? (
+                        <div className="space-y-8">
+                            {/* Header */}
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <h2 className="text-3xl font-extrabold text-gray-800 mb-2">{publicItem.name}</h2>
+                                    <div className="flex gap-2">
+                                        <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                                            {publicItem.category}
+                                        </span>
+                                        {publicItem.shortId && (
+                                            <span className="px-3 py-1 rounded-full text-sm font-mono bg-blue-50 text-blue-700 border border-blue-100">
+                                                ID: {publicItem.shortId}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100">
+                                    <div style={{ color: getCategoryColor(publicItem.category) }}>
+                                        {getCategoryIcon(publicItem.category)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Availability Card */}
+                            <div className="bg-gradient-to-r from-maroon-50 to-white border border-maroon-100 rounded-2xl p-6 shadow-sm">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Box className="w-5 h-5 text-maroon-600" />
+                                    <h3 className="text-lg font-bold text-gray-800">Availability Status</h3>
+                                </div>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-4xl font-extrabold text-maroon-600">
+                                        {publicItem.quantity - (publicItem.borrowedQuantity || 0)}
+                                    </span>
+                                    <span className="text-lg text-gray-500 font-medium">
+                                        pieces available
+                                    </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2 mt-4 overflow-hidden">
+                                    <div 
+                                        className="bg-maroon-500 h-full rounded-full transition-all duration-500" 
+                                        style={{ width: `${((publicItem.quantity - (publicItem.borrowedQuantity || 0)) / publicItem.quantity) * 100}%` }}
+                                    ></div>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-2 text-right">
+                                    Total in Inventory: {publicItem.quantity} {publicItem.unit || 'units'}
+                                </p>
+                            </div>
+
+                            {/* Details Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-gray-50 p-5 rounded-xl border border-gray-100">
+                                    <div className="flex items-center gap-2 mb-3 text-gray-700 font-bold">
+                                        <MapPin className="w-4 h-4" /> Location
+                                    </div>
+                                    <p className="text-gray-600">{publicItem.location}</p>
+                                </div>
+                                <div className="bg-gray-50 p-5 rounded-xl border border-gray-100">
+                                    <div className="flex items-center gap-2 mb-3 text-gray-700 font-bold">
+                                        <Activity className="w-4 h-4" /> Condition
+                                    </div>
+                                    <p className="text-gray-600">{publicItem.condition}</p>
+                                </div>
+                            </div>
+
+                            {/* Description */}
+                            {publicItem.description && (
+                                <div>
+                                    <h4 className="font-bold text-gray-800 mb-2">Description</h4>
+                                    <p className="text-gray-600 leading-relaxed bg-white p-4 border border-gray-100 rounded-xl">
+                                        {publicItem.description}
+                                    </p>
+                                </div>
+                            )}
+
+                             {/* Safety Notes */}
+                             {publicItem.safetyNotes && (
+                                <div className="bg-orange-50 p-5 rounded-xl border border-orange-100">
+                                    <h4 className="font-bold text-orange-800 mb-2 flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4" /> Safety Notes
+                                    </h4>
+                                    <p className="text-orange-700 text-sm leading-relaxed">
+                                        {publicItem.safetyNotes}
+                                    </p>
+                                </div>
+                            )}
+
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center">
+                            <div className="p-4 bg-gray-100 rounded-full mb-4">
+                                <Search className="w-8 h-8 text-gray-400" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-800">Item Not Found</h3>
+                            <p className="text-gray-500 mt-2">The requested equipment could not be found or has been removed.</p>
+                        </div>
+                    )}
+                 </div>
             </div>
         )}
 

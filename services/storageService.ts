@@ -17,6 +17,17 @@ export const getInventory = async (): Promise<InventoryItem[]> => {
     }
 };
 
+export const getInventoryItem = async (id: string): Promise<InventoryItem | null> => {
+    try {
+        const { data, error } = await supabase.from('inventory_items').select('*').eq('id', id).single();
+        if (error) throw error;
+        return data as InventoryItem;
+    } catch (error: any) {
+        console.error('Supabase Error (getInventoryItem):', error.message);
+        return null;
+    }
+};
+
 export const saveItem = async (item: InventoryItem): Promise<boolean> => {
     // Generate Short ID if missing
     if (!item.shortId) {

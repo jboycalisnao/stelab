@@ -1,6 +1,8 @@
-import React from 'react';
+
+
+import React, { useState, useRef, useEffect } from 'react';
 import { InventoryItem } from '../types';
-import { X, Printer } from 'lucide-react';
+import { X, Printer, Copy } from 'lucide-react';
 
 interface QRCodeModalProps {
   item: InventoryItem;
@@ -8,22 +10,105 @@ interface QRCodeModalProps {
 }
 
 const QRCodeModal: React.FC<QRCodeModalProps> = ({ item, onClose }) => {
-  const qrData = JSON.stringify({ id: item.id, name: item.name, loc: item.location });
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+  const [printQty, setPrintQty] = useState(item.quantity);
+  // Public URL for the QR code
+  const publicUrl = `${window.location.origin}?view_item=${item.id}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(publicUrl)}`;
+  const printRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
-    const printWindow = window.open('', '', 'height=400,width=400');
+    const printWindow = window.open('', '', 'height=600,width=800');
     if (printWindow) {
-      printWindow.document.write('<html><head><title>Print Label</title></head><body>');
-      printWindow.document.write(`<div style="text-align:center; font-family: sans-serif;">`);
-      printWindow.document.write(`<h2 style="margin-bottom:5px">${item.name}</h2>`);
-      printWindow.document.write(`<p style="margin:0; font-size:12px">${item.id}</p>`);
-      printWindow.document.write(`<img src="${qrUrl}" style="margin: 10px 0;" />`);
-      printWindow.document.write(`<p>Location: ${item.location}</p>`);
-      printWindow.document.write('</div></body></html>');
+      printWindow.document.write('<html><head><title>Print QR Labels</title>');
+      printWindow.document.write('<style>');
+      printWindow.document.write(`
+        @media print {
+            @page { margin: 0.5cm; }
+            body { margin: 0; padding: 0; }
+        }
+        body { font-family: sans-serif; margin: 0; padding: 10px; }
+        
+        .label-grid { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 0; 
+            justify-content: flex-start;
+        }
+        
+        .label { 
+            border: 1px dashed #ccc; 
+            width: 48mm; 
+            height: 48mm; /* Square label for QR */
+            padding: 4px; 
+            box-sizing: border-box; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            margin: 0; 
+            page-break-inside: avoid;
+            background: white;
+            overflow: hidden;
+            text-align: center;
+        }
+        
+        .item-name { 
+            font-weight: bold; 
+            font-size: 10px; 
+            margin-bottom: 2px; 
+            width: 100%; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+        }
+        
+        .qr-img {
+            width: 32mm;
+            height: 32mm;
+            display: block;
+            margin: 2px auto;
+        }
+        
+        .item-footer { 
+            font-size: 8px; 
+            color: #555;
+            line-height: 1;
+        }
+        
+        .scan-text {
+            font-size: 7px;
+            color: #888;
+            margin-top: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Screen preview */
+        @media screen {
+            .label-grid { gap: 10px; }
+            .label { margin-bottom: 0; border: 1px solid #eee; }
+        }
+      `);
+      printWindow.document.write('</style></head><body>');
+      printWindow.document.write('<div class="label-grid">');
+      
+      // Generate labels based on printQty
+      let content = '';
+      for(let i=0; i<printQty; i++) {
+          content += `
+            <div class="label">
+                <div class="item-name">${item.name}</div>
+                <img src="${qrUrl}" class="qr-img" />
+                <div class="item-footer">Loc: ${item.location}</div>
+                <div class="scan-text">Scan for Info</div>
+            </div>
+          `;
+      }
+      
+      printWindow.document.write(content);
+      printWindow.document.write('</div>');
+      printWindow.document.write('<script>window.onload = function() { window.print(); }</script>');
+      printWindow.document.write('</body></html>');
       printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
     }
   };
 
@@ -40,10 +125,19 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ item, onClose }) => {
           
           <div className="bg-white p-4 rounded-lg inline-block mb-4 border border-gray-100 shadow-inner">
             <img src={qrUrl} alt="Item QR Code" className="w-40 h-40 mix-blend-multiply" />
+            <p className="text-[10px] text-gray-400 mt-2 font-mono">Scans to public info page</p>
           </div>
 
-          <div className="text-xs text-gray-400 font-mono break-all mb-6">
-            ID: {item.id}
+          {/* Bulk Settings */}
+          <div className="flex items-center justify-center gap-2 mb-6">
+              <label className="text-sm text-gray-600 font-medium">Print Copies:</label>
+              <input 
+                type="number" 
+                min="1" 
+                value={printQty}
+                onChange={(e) => setPrintQty(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-16 border border-gray-300 rounded px-2 py-1 text-center text-sm"
+              />
           </div>
 
           <button
@@ -51,7 +145,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ item, onClose }) => {
             className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-md"
           >
             <Printer className="w-4 h-4" />
-            <span>Print Label</span>
+            <span>Print Labels</span>
           </button>
         </div>
       </div>
