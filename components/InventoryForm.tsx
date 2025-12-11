@@ -220,7 +220,8 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                                 name="maxBorrowable"
                                 min="0"
                                 max={formData.quantity}
-                                value={formData.maxBorrowable !== undefined ? formData.maxBorrowable : ''}
+                                // Use null coalescing to default to empty string if undefined OR null
+                                value={formData.maxBorrowable ?? ''}
                                 onChange={handleLimitChange}
                                 placeholder={formData.quantity?.toString()}
                                 className="w-32 px-3 py-1.5 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"

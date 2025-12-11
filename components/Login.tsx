@@ -327,8 +327,8 @@ const Login: React.FC<LoginProps> = ({
                                     <h3 className="text-lg font-bold text-gray-800">Availability Status</h3>
                                 </div>
                                 {(() => {
-                                    // Use Borrow Limit if defined
-                                    const limit = publicItem.maxBorrowable !== undefined ? publicItem.maxBorrowable : publicItem.quantity;
+                                    // Use Borrow Limit if defined (null or undefined checks via ??)
+                                    const limit = publicItem.maxBorrowable ?? publicItem.quantity;
                                     const available = Math.max(0, limit - (publicItem.borrowedQuantity || 0));
                                     const percentage = (available / limit) * 100;
                                     
@@ -349,7 +349,7 @@ const Login: React.FC<LoginProps> = ({
                                                 ></div>
                                             </div>
                                             <p className="text-xs text-gray-400 mt-2 text-right">
-                                                {publicItem.maxBorrowable !== undefined 
+                                                {publicItem.maxBorrowable != null
                                                     ? `Limited Stock (Total Inventory: ${publicItem.quantity} ${publicItem.unit || 'units'})`
                                                     : `Total in Inventory: ${publicItem.quantity} ${publicItem.unit || 'units'}`
                                                 }
