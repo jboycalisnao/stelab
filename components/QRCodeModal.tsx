@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import { InventoryItem } from '../types';
 import { X, Printer, Copy } from 'lucide-react';
@@ -37,9 +36,9 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ item, onClose }) => {
         
         .label { 
             border: 1px dashed #ccc; 
-            width: 48mm; 
-            height: 48mm; /* Square label for QR */
-            padding: 4px; 
+            width: 32mm; 
+            height: 32mm; /* Smaller square label */
+            padding: 2px; 
             box-sizing: border-box; 
             display: flex; 
             flex-direction: column; 
@@ -54,8 +53,8 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ item, onClose }) => {
         
         .item-name { 
             font-weight: bold; 
-            font-size: 10px; 
-            margin-bottom: 2px; 
+            font-size: 8px; 
+            margin-bottom: 1px; 
             width: 100%; 
             white-space: nowrap; 
             overflow: hidden; 
@@ -63,22 +62,26 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ item, onClose }) => {
         }
         
         .qr-img {
-            width: 32mm;
-            height: 32mm;
+            width: 22mm;
+            height: 22mm;
             display: block;
-            margin: 2px auto;
+            margin: 1px auto;
         }
         
         .item-footer { 
-            font-size: 8px; 
+            font-size: 6px; 
             color: #555;
             line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            width: 100%;
+            text-overflow: ellipsis;
         }
         
         .scan-text {
-            font-size: 7px;
+            font-size: 5px;
             color: #888;
-            margin-top: 2px;
+            margin-top: 1px;
             text-transform: uppercase;
         }
 
@@ -98,7 +101,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ item, onClose }) => {
             <div class="label">
                 <div class="item-name">${item.name}</div>
                 <img src="${qrUrl}" class="qr-img" />
-                <div class="item-footer">Loc: ${item.location}</div>
+                <div class="item-footer">${item.location}</div>
                 <div class="scan-text">Scan for Info</div>
             </div>
           `;
