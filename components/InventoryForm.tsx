@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { InventoryItem, ItemCondition, Category, InventoryBox } from '../types';
 import { X, Box, Lock, Plus, PackageOpen, Trash2 } from 'lucide-react';
@@ -35,6 +34,8 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
   const [useBorrowLimit, setUseBorrowLimit] = useState<boolean>(hasLimit);
 
   // Boxed Item State
+  const hasBoxes = initialData?.boxes && initialData.boxes.length > 0;
+  const [enableBoxTracking, setEnableBoxTracking] = useState<boolean>(!!hasBoxes);
   const [newBoxCount, setNewBoxCount] = useState(1);
   const [qtyPerBox, setQtyPerBox] = useState(10);
   const [boxes, setBoxes] = useState<InventoryBox[]>(initialData?.boxes || []);
@@ -97,7 +98,8 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
     }
     
     // Logic check: Max borrowable shouldn't exceed total quantity
-    const finalData = { ...formData, boxes: boxes };
+    // If box tracking is disabled, we send an empty boxes array
+    const finalData = { ...formData, boxes: enableBoxTracking ? boxes : [] };
     
     if (!useBorrowLimit) {
         // Explicitly set to null to indicate clearing the limit in the DB
@@ -199,82 +201,101 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
               </div>
             </div>
             
-            {/* Boxed Items Management */}
-            <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-                <div className="flex items-center gap-2 mb-3">
-                    <PackageOpen className="w-5 h-5 text-indigo-600" />
-                    <h3 className="font-bold text-gray-800">Boxed Stock Management</h3>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-3 mb-3">
-                    <div>
-                        <label className="text-xs font-medium text-gray-600 block mb-1">Number of Boxes</label>
-                        <input 
-                            type="number" 
-                            min="1"
-                            value={newBoxCount} 
-                            onChange={(e) => setNewBoxCount(parseInt(e.target.value) || 1)}
-                            className="w-full px-3 py-1.5 text-sm border border-indigo-200 rounded-md"
-                        />
-                    </div>
-                    <div>
-                         <label className="text-xs font-medium text-gray-600 block mb-1">Qty per Box</label>
-                         <input 
-                            type="number" 
-                            min="1"
-                            value={qtyPerBox} 
-                            onChange={(e) => setQtyPerBox(parseInt(e.target.value) || 1)}
-                            className="w-full px-3 py-1.5 text-sm border border-indigo-200 rounded-md"
-                        />
-                    </div>
-                    <div className="flex items-end">
-                        <button 
-                            type="button" 
-                            onClick={handleAddBoxes}
-                            className="w-full px-3 py-1.5 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 flex items-center justify-center gap-1"
-                        >
-                            <Plus className="w-4 h-4" /> Add Boxes
-                        </button>
-                    </div>
-                </div>
-
-                {boxes.length > 0 && (
-                    <div className="mt-4 bg-white rounded-lg border border-gray-200 max-h-40 overflow-y-auto p-2">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-gray-50 text-xs text-gray-500">
-                                <tr>
-                                    <th className="px-2 py-1">Label</th>
-                                    <th className="px-2 py-1">Qty</th>
-                                    <th className="px-2 py-1">Status</th>
-                                    <th className="px-2 py-1 text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {boxes.map(box => (
-                                    <tr key={box.id} className="border-b last:border-0 border-gray-100">
-                                        <td className="px-2 py-1.5 font-medium">{box.label}</td>
-                                        <td className="px-2 py-1.5">{box.quantity}</td>
-                                        <td className="px-2 py-1.5">
-                                            <span className={`text-xs px-1.5 py-0.5 rounded ${box.status === 'Sealed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                                                {box.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-2 py-1.5 text-right">
-                                            <button 
-                                                type="button" 
-                                                onClick={() => handleRemoveBox(box.id, box.quantity)}
-                                                className="text-red-400 hover:text-red-600"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+            {/* Boxed Items Management Toggle */}
+            <div className="flex items-center space-x-3 bg-indigo-50 p-3 rounded-lg border border-indigo-100 transition-all">
+                <input
+                    type="checkbox"
+                    id="enableBoxTracking"
+                    checked={enableBoxTracking}
+                    onChange={(e) => setEnableBoxTracking(e.target.checked)}
+                    className="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                />
+                <label htmlFor="enableBoxTracking" className="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-2">
+                    <PackageOpen className="w-4 h-4 text-indigo-600" />
+                    Enable Boxed Stock Tracking
+                </label>
             </div>
+
+            {/* Boxed Items Management Panel */}
+            {enableBoxTracking && (
+                <div className="bg-white p-4 rounded-lg border border-indigo-100 shadow-sm ml-4 border-l-4 border-l-indigo-400 animate-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2 mb-3">
+                        <PackageOpen className="w-5 h-5 text-indigo-600" />
+                        <h3 className="font-bold text-gray-800">Boxed Stock Details</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">Number of Boxes</label>
+                            <input 
+                                type="number" 
+                                min="1"
+                                value={newBoxCount} 
+                                onChange={(e) => setNewBoxCount(parseInt(e.target.value) || 1)}
+                                className="w-full px-3 py-1.5 text-sm border border-indigo-200 rounded-md"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">Qty per Box</label>
+                            <input 
+                                type="number" 
+                                min="1"
+                                value={qtyPerBox} 
+                                onChange={(e) => setQtyPerBox(parseInt(e.target.value) || 1)}
+                                className="w-full px-3 py-1.5 text-sm border border-indigo-200 rounded-md"
+                            />
+                        </div>
+                        <div className="flex items-end">
+                            <button 
+                                type="button" 
+                                onClick={handleAddBoxes}
+                                className="w-full px-3 py-1.5 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 flex items-center justify-center gap-1"
+                            >
+                                <Plus className="w-4 h-4" /> Generate Boxes
+                            </button>
+                        </div>
+                    </div>
+
+                    {boxes.length > 0 ? (
+                        <div className="mt-4 bg-white rounded-lg border border-gray-200 max-h-40 overflow-y-auto p-2">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-gray-50 text-xs text-gray-500">
+                                    <tr>
+                                        <th className="px-2 py-1">Label</th>
+                                        <th className="px-2 py-1">Qty</th>
+                                        <th className="px-2 py-1">Status</th>
+                                        <th className="px-2 py-1 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {boxes.map(box => (
+                                        <tr key={box.id} className="border-b last:border-0 border-gray-100">
+                                            <td className="px-2 py-1.5 font-medium">{box.label}</td>
+                                            <td className="px-2 py-1.5">{box.quantity}</td>
+                                            <td className="px-2 py-1.5">
+                                                <span className={`text-xs px-1.5 py-0.5 rounded ${box.status === 'Sealed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                    {box.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-2 py-1.5 text-right">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => handleRemoveBox(box.id, box.quantity)}
+                                                    className="text-red-400 hover:text-red-600"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <p className="text-xs text-gray-400 text-center py-2">No boxes generated yet.</p>
+                    )}
+                </div>
+            )}
 
             {/* Borrow Limit Section */}
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
