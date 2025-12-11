@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { InventoryItem, ItemCondition, Category } from '../types';
 import { Edit2, Trash2, QrCode, Search, Filter, HandPlatter, Barcode, FileText, List, Printer, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { getCategoryColor, getCategoryIcon } from '../constants';
@@ -12,19 +12,28 @@ interface InventoryListProps {
   onShowQR: (item: InventoryItem) => void;
   onBorrow: (item: InventoryItem) => void;
   onPrintBarcodes: (item: InventoryItem) => void;
+  initialSearchTerm?: string;
 }
 
-const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit, onDelete, onShowQR, onBorrow, onPrintBarcodes }) => {
+const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit, onDelete, onShowQR, onBorrow, onPrintBarcodes, initialSearchTerm }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'report'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('All');
+
+  // Handle Initial Search Term (e.g. from Deep Link)
+  useEffect(() => {
+      if (initialSearchTerm) {
+          setSearchTerm(initialSearchTerm);
+      }
+  }, [initialSearchTerm]);
 
   // --- Filtering Logic ---
   const filteredItems = useMemo(() => {
       return items.filter(item => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             item.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            (item.shortId && item.shortId.toLowerCase().includes(searchTerm.toLowerCase()));
+                            (item.shortId && item.shortId.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                            item.id.toLowerCase().includes(searchTerm.toLowerCase()); // Added UUID search support
         const matchesCategory = filterCategory === 'All' || item.category === filterCategory;
         return matchesSearch && matchesCategory;
       });

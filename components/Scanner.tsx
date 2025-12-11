@@ -44,7 +44,11 @@ const Scanner: React.FC<ScannerProps> = ({ items, borrowRecords, onBorrow, onRet
   useEffect(() => {
     return () => {
       if (scannerRef.current) {
-        scannerRef.current.clear().catch(console.error);
+        try {
+            scannerRef.current.clear().catch((e: any) => console.warn("Failed to clear scanner", e));
+        } catch (e) {
+            // ignore
+        }
         scannerRef.current = null;
       }
     };
@@ -63,45 +67,77 @@ const Scanner: React.FC<ScannerProps> = ({ items, borrowRecords, onBorrow, onRet
   const startCamera = () => {
     setScanMethod('camera');
     setTimeout(() => {
-        const html5QrcodeScanner = new (window as any).Html5QrcodeScanner(
-            "reader",
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            false
-        );
-        
-        html5QrcodeScanner.render((decodedText: string) => {
-            handleScan(decodedText);
-            // In audit mode, we keep scanning.
-            if (mode === 'search') {
-                html5QrcodeScanner.clear();
+        try {
+            // Check if library is loaded
+            if (!(window as any).Html5QrcodeScanner) {
+                setScanFeedback({ message: "Scanner library not loaded. Check internet connection.", type: 'error' });
                 setScanMethod('manual');
+                return;
             }
-        }, (errorMessage: string) => {
-            // ignore errors
-        });
-        scannerRef.current = html5QrcodeScanner;
+
+            const html5QrcodeScanner = new (window as any).Html5QrcodeScanner(
+                "reader",
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                false
+            );
+            
+            html5QrcodeScanner.render((decodedText: string) => {
+                handleScan(decodedText);
+                // In search mode, stop after one successful scan
+                if (mode === 'search') {
+                     html5QrcodeScanner.clear().catch((e: any) => console.error("Failed to clear", e));
+                     setScanMethod('manual');
+                }
+            }, (errorMessage: string) => {
+                // ignore errors during scanning
+            });
+            scannerRef.current = html5QrcodeScanner;
+        } catch (e) {
+            console.error("Camera Init Error", e);
+            setScanFeedback({ message: "Failed to initialize camera.", type: 'error' });
+            setScanMethod('manual');
+        }
     }, 100);
   };
 
   const stopCamera = () => {
       if (scannerRef.current) {
-          scannerRef.current.clear();
+          try {
+            scannerRef.current.clear().catch((e: any) => console.warn("Clear error", e));
+          } catch(e) {}
       }
       setScanMethod('manual');
   };
 
+  const parseScannedCode = (code: string) => {
+      try {
+          // Check if it's a URL (e.g. from the QR Code Modal)
+          if (code.startsWith('http') || code.includes('view_item=')) {
+              const url = new URL(code);
+              const viewItem = url.searchParams.get('view_item');
+              if (viewItem) return viewItem;
+          }
+      } catch (e) {
+          // not a url, ignore
+      }
+      return code;
+  };
+
   const handleScan = (code: string) => {
+      const parsedCode = parseScannedCode(code);
+      // Update the manual input so user sees what was scanned
+      setInputVal(parsedCode);
+
       if (mode === 'search') {
-          handleSearch(code);
+          handleSearch(parsedCode);
       } else {
-          handleAuditScan(code);
+          handleAuditScan(parsedCode);
       }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
         handleScan(inputVal);
-        setInputVal(''); // Clear after scan
     }
   };
 
@@ -358,7 +394,7 @@ const Scanner: React.FC<ScannerProps> = ({ items, borrowRecords, onBorrow, onRet
                         </div>
                         
                         <div className="flex justify-center mt-6 space-x-4">
-                            <button onClick={() => handleSearch(inputVal)} className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow-md">Find Item</button>
+                            <button onClick={() => handleScan(inputVal)} className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow-md">Find Item</button>
                             <button onClick={startCamera} className="px-6 py-2 bg-gray-800 text-white rounded-lg shadow-md flex items-center gap-2"><Camera className="w-4 h-4"/> Camera</button>
                         </div>
                     </div>

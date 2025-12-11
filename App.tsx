@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
@@ -58,6 +59,9 @@ const App: React.FC = () => {
     isDestructive: false
   });
 
+  // Deep Link State
+  const [initialSearchTerm, setInitialSearchTerm] = useState('');
+
   const refreshData = React.useCallback(async (silent = false) => {
       if (!silent) setIsLoading(true);
       try {
@@ -100,6 +104,20 @@ const App: React.FC = () => {
         channels.forEach(ch => supabase.removeChannel(ch));
     };
   }, [refreshData]);
+
+  // Handle Deep Links (View Item)
+  useEffect(() => {
+    if (isAuthenticated) {
+        const params = new URLSearchParams(window.location.search);
+        const viewItem = params.get('view_item');
+        if (viewItem) {
+            setInitialSearchTerm(viewItem);
+            setView('inventory');
+            // Clean URL to prevent loop/clutter
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -434,6 +452,7 @@ const App: React.FC = () => {
                                     onShowQR={setQrItem}
                                     onPrintBarcodes={setBarcodeItem}
                                     onBorrow={(item) => openBorrowModal(item)}
+                                    initialSearchTerm={initialSearchTerm}
                                 />
                             )}
                             {view === 'requests' && !isMobile && (
