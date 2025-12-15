@@ -1,11 +1,9 @@
-
-
 import { InventoryItem, BorrowRecord, AppSettings, Category, ItemCondition, AuditLog, BorrowRequest, RequestStatus } from '../types';
 import { supabase } from '../supabaseClient';
 import { DEFAULT_CATEGORIES } from '../constants';
 
 // --- Metadata Helper Functions ---
-// These allow us to store new fields (maxBorrowable, isConsumable, boxes) in the existing 'description' column
+// These allow us to store new fields (maxBorrowable, isConsumable, boxes, settings) in existing text columns
 // to avoid "Column not found" errors if the database schema hasn't been updated.
 
 const METADATA_TAG = "<!--SYSTEM_META:";
@@ -79,6 +77,61 @@ const prepareInventoryItemForSave = (item: InventoryItem): any => {
         payload.description = (payload.description || '').trim() + `\n\n${METADATA_TAG}${JSON.stringify(meta)}${METADATA_END}`;
     }
 
+    return payload;
+};
+
+// --- Settings Metadata Helpers ---
+const parseAppSettings = (data: any): AppSettings => {
+    if (!data) return { appName: 'STE Laboratory Inventory System' };
+    
+    let settings: AppSettings = { ...data };
+    
+    // Check customFooterText for metadata (Using footer text as carrier for extra settings)
+    if (settings.customFooterText && settings.customFooterText.includes(METADATA_TAG)) {
+        const start = settings.customFooterText.indexOf(METADATA_TAG);
+        const end = settings.customFooterText.indexOf(METADATA_END, start);
+        
+        if (start !== -1 && end !== -1) {
+            try {
+                const jsonStr = settings.customFooterText.substring(start + METADATA_TAG.length, end);
+                const meta = JSON.parse(jsonStr);
+                
+                // Merge extra settings
+                if (meta.googleAppsScriptUrl) settings.googleAppsScriptUrl = meta.googleAppsScriptUrl;
+                if (meta.notificationEmails) settings.notificationEmails = meta.notificationEmails;
+                
+                // Clean footer text for UI
+                settings.customFooterText = settings.customFooterText.substring(0, start).trim();
+            } catch (e) {
+                console.warn("Settings metadata parse error", e);
+            }
+        }
+    }
+    return settings;
+};
+
+const prepareAppSettingsForSave = (settings: AppSettings): any => {
+    const payload: any = { ...settings };
+    const meta: any = {};
+    let hasMeta = false;
+    
+    // Extract new fields that might not be in the DB schema
+    if (payload.googleAppsScriptUrl) {
+        meta.googleAppsScriptUrl = payload.googleAppsScriptUrl;
+        hasMeta = true;
+        delete payload.googleAppsScriptUrl; // Remove to avoid column error
+    }
+    if (payload.notificationEmails) {
+        meta.notificationEmails = payload.notificationEmails;
+        hasMeta = true;
+        delete payload.notificationEmails; // Remove to avoid column error
+    }
+    
+    // Embed in customFooterText
+    if (hasMeta) {
+        payload.customFooterText = (payload.customFooterText || '').trim() + `\n\n${METADATA_TAG}${JSON.stringify(meta)}${METADATA_END}`;
+    }
+    
     return payload;
 };
 
@@ -531,7 +584,7 @@ export const getSettings = async (): Promise<AppSettings> => {
             }
             throw error;
         }
-        return data as AppSettings;
+        return parseAppSettings(data);
     } catch (error: any) {
         console.error('Supabase Error (getSettings):', error.message);
         return { appName: 'STE Laboratory Inventory System' };
@@ -540,7 +593,10 @@ export const getSettings = async (): Promise<AppSettings> => {
 
 export const saveSettings = async (settings: AppSettings): Promise<boolean> => {
     try {
-        const { error } = await supabase.from('app_settings').upsert({ ...settings, id: 1 });
+        // Pack metadata for new fields to avoid schema errors if columns missing
+        const payload = prepareAppSettingsForSave(settings);
+        
+        const { error } = await supabase.from('app_settings').upsert({ ...payload, id: 1 });
         if (error) throw error;
         return true;
     } catch (error: any) {

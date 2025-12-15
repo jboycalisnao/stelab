@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
@@ -325,8 +323,12 @@ const App: React.FC = () => {
   };
 
   const handleSettingsSave = async (newSettings: AppSettings) => {
-      await storage.saveSettings(newSettings);
-      await refreshData(true);
+      const success = await storage.saveSettings(newSettings);
+      if (success) {
+        await refreshData(true);
+      } else {
+        throw new Error("Could not save settings to database. Please check connection.");
+      }
   };
 
   const handlePasswordReset = async (newPassword: string) => {
