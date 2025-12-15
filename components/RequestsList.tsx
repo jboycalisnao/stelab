@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BorrowRequest, RequestStatus } from '../types';
 import * as storage from '../services/storageService';
+import { getUserStatusUpdateTemplate } from '../services/emailTemplates';
 import { Search, CheckCircle, XCircle, Trash2, Printer, Eye, Clock, FileText, Loader2, Send } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 
@@ -77,6 +78,50 @@ const RequestsList: React.FC<RequestsListProps> = () => {
     });
   };
 
+  const sendUserUpdateEmail = async (request: BorrowRequest, status: 'Approved' | 'Released') => {
+      if (!request.borrowerEmail) return;
+
+      try {
+          const settings = await storage.getSettings();
+          if (!settings.googleAppsScriptUrl) return;
+
+          const htmlBody = getUserStatusUpdateTemplate({
+              borrowerName: request.borrowerName,
+              referenceCode: request.referenceCode,
+              status: status,
+              returnDate: request.returnDate,
+              appName: settings.appName,
+              items: request.items.map(i => ({ name: i.itemName, qty: i.quantity }))
+          });
+
+          let subject = `Request Update: ${request.referenceCode} - ${status}`;
+          let plainBody = `Dear ${request.borrowerName},\n\nYour borrow request (${request.referenceCode}) has been ${status}.\n`;
+          
+          if (status === 'Approved') {
+              plainBody += `Please proceed to the laboratory to collect your items.\n`;
+          } else if (status === 'Released') {
+              plainBody += `You have successfully collected your items. Please return them by ${request.returnDate}.\n`;
+          }
+          
+          plainBody += `\nThank you,\n${settings.appName}`;
+
+          await fetch(settings.googleAppsScriptUrl, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'text/plain' },
+              body: JSON.stringify({
+                  to_email: request.borrowerEmail,
+                  subject: subject,
+                  body: plainBody,
+                  html_body: htmlBody,
+                  app_name: settings.appName
+              })
+          });
+      } catch (e) {
+          console.error("Failed to send user update email", e);
+      }
+  };
+
   const handleApprove = async (request: BorrowRequest) => {
       confirmAction(
         "Approve Request",
@@ -85,6 +130,10 @@ const RequestsList: React.FC<RequestsListProps> = () => {
              setProcessingId(request.id);
             const result = await storage.processApprovedRequest(request);
             if (result.success) {
+                // Send notification if email exists
+                if (request.borrowerEmail) {
+                    await sendUserUpdateEmail(request, 'Approved');
+                }
                 await loadRequests();
             } else {
                 alert("Failed to process request: " + result.message);
@@ -103,6 +152,12 @@ const RequestsList: React.FC<RequestsListProps> = () => {
              setProcessingId(request.id);
              // We use a custom status 'Released' which isn't in the strict enum initially but we can cast or handle it
              await storage.updateBorrowRequestStatus(request.id, 'Released' as RequestStatus);
+             
+             // Send notification if email exists
+             if (request.borrowerEmail) {
+                 await sendUserUpdateEmail(request, 'Released');
+             }
+             
              await loadRequests();
              setProcessingId(null);
         },
@@ -285,7 +340,11 @@ const RequestsList: React.FC<RequestsListProps> = () => {
                                 </div>
                                 <div>
                                     <h4 className="font-bold text-gray-800">{req.borrowerName}</h4>
-                                    <p className="text-sm text-gray-500">{req.borrowerId} • {new Date(req.requestDate).toLocaleDateString()}</p>
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                        <span>{req.borrowerId}</span>
+                                        {req.borrowerEmail && <span className="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded-md border border-blue-100 truncate max-w-[150px]">{req.borrowerEmail}</span>}
+                                        <span>• {new Date(req.requestDate).toLocaleDateString()}</span>
+                                    </div>
                                     <div className="mt-2 flex flex-wrap gap-2">
                                         {req.items.map((item, idx) => (
                                             <span key={idx} className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs border border-gray-200 flex items-center gap-1">

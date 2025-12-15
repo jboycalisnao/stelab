@@ -55,21 +55,27 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const GAS_CODE = `function doPost(e) {
+  // This script handles email sending for SciLab Inventory
   try {
     var data = JSON.parse(e.postData.contents);
     var to = data.to_email;
     var subject = data.subject || ("Lab Request: " + (data.reference_code || "Unknown"));
+    var appName = data.app_name || "Lab Inventory System";
     
     // Support both plain text and HTML bodies
-    var body = data.body || " "; 
+    var body = data.body || "New request received."; 
     var htmlBody = data.html_body;
 
+    var options = {
+      name: appName // Sender Name
+    };
+
+    if (htmlBody) {
+      options.htmlBody = htmlBody;
+    }
+
     if (to) {
-      if (htmlBody) {
-        GmailApp.sendEmail(to, subject, body, { htmlBody: htmlBody });
-      } else {
-        GmailApp.sendEmail(to, subject, body);
-      }
+      GmailApp.sendEmail(to, subject, body, options);
     }
     
     return ContentService.createTextOutput(JSON.stringify({result: 'success'}))
@@ -151,7 +157,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
   };
 
   const handleTestEmail = async () => {
-      const { googleAppsScriptUrl, notificationEmails, recoveryEmail } = formData;
+      const { googleAppsScriptUrl, notificationEmails, recoveryEmail, appName } = formData;
       
       if (!googleAppsScriptUrl) {
           alert("Please provide the Google Apps Script Web App URL first.");
@@ -175,9 +181,10 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
               },
               body: JSON.stringify({
                   to_email: recipient,
-                  subject: "Test Connection - SciLab Inventory",
+                  subject: `Test Connection - ${appName}`,
                   body: "This is a test email to verify your Google Apps Script connection is working correctly.",
-                  html_body: "<h3>Test Successful</h3><p>Your Google Apps Script connection is working correctly.</p>"
+                  html_body: "<h3>Test Successful</h3><p>Your Google Apps Script connection is working correctly.</p><p>This email confirms that the <strong>HTML</strong> functionality is active.</p>",
+                  app_name: appName
               })
           });
           

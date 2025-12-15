@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import { DEFAULT_CATEGORIES } from '../constants';
 
 // --- Metadata Helper Functions ---
-// These allow us to store new fields (maxBorrowable, isConsumable, boxes, settings) in existing text columns
+// These allow us to store new fields (maxBorrowable, isConsumable, boxes, settings, borrowerEmail) in existing text columns
 // to avoid "Column not found" errors if the database schema hasn't been updated.
 
 const METADATA_TAG = "<!--SYSTEM_META:";
@@ -75,6 +75,51 @@ const prepareInventoryItemForSave = (item: InventoryItem): any => {
     if (hasMeta) {
         // We append it to the description so it persists in a standard text column
         payload.description = (payload.description || '').trim() + `\n\n${METADATA_TAG}${JSON.stringify(meta)}${METADATA_END}`;
+    }
+
+    return payload;
+};
+
+// --- Request Metadata Helpers (Pack email into adminNotes) ---
+
+const parseBorrowRequest = (data: any): BorrowRequest => {
+    if (!data) return data;
+    let req: BorrowRequest = { ...data };
+
+    if (req.adminNotes && req.adminNotes.includes(METADATA_TAG)) {
+        const start = req.adminNotes.indexOf(METADATA_TAG);
+        const end = req.adminNotes.indexOf(METADATA_END, start);
+        
+        if (start !== -1 && end !== -1) {
+             try {
+                const jsonStr = req.adminNotes.substring(start + METADATA_TAG.length, end);
+                const meta = JSON.parse(jsonStr);
+                
+                if (meta.borrowerEmail) req.borrowerEmail = meta.borrowerEmail;
+
+                // Clean adminNotes for UI
+                req.adminNotes = req.adminNotes.substring(0, start).trim();
+            } catch (e) {
+                console.warn("Request metadata parse error", e);
+            }
+        }
+    }
+    return req;
+};
+
+const prepareBorrowRequestForSave = (req: Partial<BorrowRequest>): any => {
+    const payload: any = { ...req };
+    const meta: any = {};
+    let hasMeta = false;
+
+    if (payload.borrowerEmail) {
+        meta.borrowerEmail = payload.borrowerEmail;
+        hasMeta = true;
+        delete payload.borrowerEmail; // Remove to avoid column error
+    }
+
+    if (hasMeta) {
+        payload.adminNotes = (payload.adminNotes || '').trim() + `\n\n${METADATA_TAG}${JSON.stringify(meta)}${METADATA_END}`;
     }
 
     return payload;
@@ -443,14 +488,19 @@ export const deleteBorrowRecords = async (recordIds: string[]): Promise<{ succes
 
 export const createBorrowRequest = async (request: Omit<BorrowRequest, 'id' | 'status'>): Promise<BorrowRequest | null> => {
     try {
-        const newRequest = {
+        const newRequest: BorrowRequest = {
             ...request,
             id: crypto.randomUUID(),
             status: 'Pending',
         };
-        const { error } = await supabase.from('borrow_requests').insert(newRequest);
+
+        // Pack email into adminNotes if necessary to avoid column error
+        const payload = prepareBorrowRequestForSave(newRequest);
+
+        const { error } = await supabase.from('borrow_requests').insert(payload);
         if (error) throw error;
-        return newRequest as BorrowRequest;
+        
+        return newRequest;
     } catch (error: any) {
         console.error('Supabase Error (createBorrowRequest):', error.message);
         return null;
@@ -461,7 +511,7 @@ export const getBorrowRequests = async (): Promise<BorrowRequest[]> => {
     try {
         const { data, error } = await supabase.from('borrow_requests').select('*');
         if (error) throw error;
-        return data as BorrowRequest[];
+        return (data || []).map(parseBorrowRequest);
     } catch (error: any) {
         console.error('Supabase Error (getBorrowRequests):', error.message);
         return [];
@@ -472,7 +522,7 @@ export const getBorrowRequestByCode = async (code: string): Promise<BorrowReques
     try {
         const { data, error } = await supabase.from('borrow_requests').select('*').eq('referenceCode', code).single();
         if (error) throw error;
-        return data as BorrowRequest;
+        return parseBorrowRequest(data);
     } catch (error: any) {
         console.error('Supabase Error (getBorrowRequestByCode):', error.message);
         return null;
@@ -497,9 +547,18 @@ export const deleteBorrowRequest = async (id: string): Promise<boolean> => {
     try {
         // 1. Fetch the request to check for linked borrow records
         const { data: req, error: fetchError } = await supabase.from('borrow_requests').select('*').eq('id', id).single();
-        if (fetchError || !req) throw new Error("Request not found");
+        
+        // Handle "Not Found" error gracefully. If it's gone, we consider deletion successful.
+        if (fetchError) {
+            if (fetchError.code === 'PGRST116') {
+                return true; 
+            }
+            throw fetchError;
+        }
+        
+        if (!req) return true;
 
-        const request = req as BorrowRequest;
+        const request = parseBorrowRequest(req);
         
         // 2. Collect linked record IDs
         const linkedIds = request.items
@@ -586,7 +645,12 @@ export const getSettings = async (): Promise<AppSettings> => {
         }
         return parseAppSettings(data);
     } catch (error: any) {
-        console.error('Supabase Error (getSettings):', error.message);
+        // Suppress network errors for settings as we have defaults, to keep console clean.
+        // Only log if it's NOT a fetch error.
+        const isNetworkError = error.message?.includes('Failed to fetch') || error.name === 'TypeError';
+        if (!isNetworkError) {
+            console.error('Supabase Error (getSettings):', error.message);
+        }
         return { appName: 'STE Laboratory Inventory System' };
     }
 };

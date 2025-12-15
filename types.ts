@@ -126,6 +126,7 @@ export interface BorrowRequest {
   referenceCode: string;
   borrowerName: string;
   borrowerId: string;
+  borrowerEmail?: string; // New field for notifications
   requestDate: string;
   returnDate: string;
   status: RequestStatus;

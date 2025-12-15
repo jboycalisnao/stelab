@@ -140,3 +140,69 @@ p { color: #64748b; font-size: 14px; line-height: 1.5; margin-bottom: 25px; }
 </body>
 </html>
 `;
+
+export const getUserStatusUpdateTemplate = (data: {
+  borrowerName: string;
+  referenceCode: string;
+  status: 'Approved' | 'Released';
+  returnDate: string;
+  appName: string;
+  items: { name: string; qty: number }[];
+}) => {
+  const isApproved = data.status === 'Approved';
+  const headerColor = isApproved ? '#059669' : '#4f46e5'; // Green for Approved, Indigo for Released
+  const title = isApproved ? 'Request Approved' : 'Items Released';
+  const message = isApproved 
+      ? `Your borrow request has been approved. Please proceed to the laboratory to collect your equipment.` 
+      : `You have successfully collected your equipment. Please ensure all items are returned in good condition by the due date.`;
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Request Update</title>
+<style>
+body { font-family: 'Segoe UI', sans-serif; background-color: #f4f4f5; padding: 20px; margin: 0; }
+.container { max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+.header { background-color: ${headerColor}; padding: 25px; text-align: center; color: white; }
+.header h1 { margin: 0; font-size: 22px; }
+.content { padding: 30px; color: #334155; }
+.status-badge { display: inline-block; background: ${isApproved ? '#d1fae5' : '#e0e7ff'}; color: ${isApproved ? '#065f46' : '#3730a3'}; padding: 5px 12px; border-radius: 15px; font-weight: bold; font-size: 12px; margin-bottom: 15px; }
+.info-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin: 20px 0; }
+.info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+.info-row:last-child { margin-bottom: 0; }
+.label { color: #64748b; }
+.val { font-weight: 600; color: #0f172a; }
+.footer { background: #f8fafc; padding: 15px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+ul { padding-left: 20px; margin: 10px 0; }
+li { margin-bottom: 5px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>${title}</h1>
+  </div>
+  <div class="content">
+    <p>Dear <strong>${data.borrowerName}</strong>,</p>
+    <p>${message}</p>
+    
+    <div class="info-box">
+        <div class="info-row"><span class="label">Reference Code</span><span class="val">${data.referenceCode}</span></div>
+        <div class="info-row"><span class="label">Return Date</span><span class="val">${data.returnDate}</span></div>
+    </div>
+
+    <p style="font-size: 14px; font-weight: 600; margin-bottom: 5px;">Items:</p>
+    <ul>
+      ${data.items.map(i => `<li>${i.qty}x ${i.name}</li>`).join('')}
+    </ul>
+  </div>
+  <div class="footer">
+    ${data.appName} • Automated Notification
+  </div>
+</div>
+</body>
+</html>
+`;
+};

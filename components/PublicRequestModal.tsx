@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, BorrowRequest, RequestItem } from '../types';
 import * as storage from '../services/storageService';
 import { getBorrowRequestTemplate } from '../services/emailTemplates';
-import { X, Search, ShoppingBag, Plus, Trash2, ArrowRight, ArrowLeft, CheckCircle, ChevronDown, ChevronRight, Mail } from 'lucide-react';
+import { X, Search, ShoppingBag, Plus, Trash2, ArrowRight, ArrowLeft, CheckCircle, ChevronDown, ChevronRight, Mail, AtSign } from 'lucide-react';
 import { getCategoryIcon, getCategoryColor } from '../constants';
 
 interface PublicRequestModalProps {
@@ -18,6 +18,7 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
   // Form State
   const [borrowerName, setBorrowerName] = useState('');
   const [borrowerId, setBorrowerId] = useState('');
+  const [borrowerEmail, setBorrowerEmail] = useState('');
   const [returnDate, setReturnDate] = useState('');
   const [selectedItems, setSelectedItems] = useState<RequestItem[]>([]);
   
@@ -133,6 +134,7 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
 Reference Code: ${request.referenceCode}
 Borrower: ${request.borrowerName} (${request.borrowerId})
 Return Date: ${request.returnDate}
+Contact: ${request.borrowerEmail || 'N/A'}
 
 Items Requested:
 ${itemListString}
@@ -189,6 +191,7 @@ This is an automated message from ${settings.appName}.`;
           referenceCode: refCode,
           borrowerName,
           borrowerId,
+          borrowerEmail,
           returnDate,
           requestDate: new Date().toISOString(),
           items: selectedItems
@@ -233,15 +236,22 @@ This is an automated message from ${settings.appName}.`;
                 <div className="max-w-xl mx-auto space-y-6 animate-in fade-in slide-in-from-right-8 duration-300">
                     <h3 className="text-lg font-bold text-gray-800 border-b pb-2">Borrower Information</h3>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                         <input type="text" value={borrowerName} onChange={(e) => setBorrowerName(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-maroon-500 bg-white" placeholder="e.g. Juan Dela Cruz" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">ID Number / Grade & Section</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">ID Number / Grade & Section *</label>
                         <input type="text" value={borrowerId} onChange={(e) => setBorrowerId(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-maroon-500 bg-white" placeholder="e.g. 10-Newton / 2024-001" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Return Date</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email Address <span className="text-gray-400 font-normal">(Optional, for status updates)</span></label>
+                        <div className="relative">
+                            <input type="email" value={borrowerEmail} onChange={(e) => setBorrowerEmail(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-maroon-500 bg-white" placeholder="e.g. student@school.edu" />
+                            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Return Date *</label>
                         <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-maroon-500 bg-white" />
                     </div>
                 </div>
@@ -371,7 +381,11 @@ This is an automated message from ${settings.appName}.`;
                                  <span className="block text-gray-500">ID / Section</span>
                                  <span className="font-bold text-gray-800">{borrowerId}</span>
                              </div>
-                             <div className="col-span-2">
+                             <div>
+                                 <span className="block text-gray-500">Email</span>
+                                 <span className="font-bold text-gray-800">{borrowerEmail || 'N/A'}</span>
+                             </div>
+                             <div>
                                  <span className="block text-gray-500">Return Date</span>
                                  <span className="font-bold text-maroon-600">{returnDate}</span>
                              </div>
