@@ -124,7 +124,22 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
               return;
           }
 
-          // 2. Prepare HTML Body
+          // 2. Prepare Email Content
+          const itemListString = request.items.map(i => `• ${i.quantity}x ${i.itemName}`).join('\n');
+          
+          // Explicit Plain Text Body (Fallback for email clients that don't render HTML)
+          const plainTextBody = `New Borrow Request
+------------------
+Reference Code: ${request.referenceCode}
+Borrower: ${request.borrowerName} (${request.borrowerId})
+Return Date: ${request.returnDate}
+
+Items Requested:
+${itemListString}
+
+This is an automated message from ${settings.appName}.`;
+
+          // HTML Body (The pretty version)
           const htmlBody = getBorrowRequestTemplate({
               borrowerName: request.borrowerName,
               borrowerId: request.borrowerId,
@@ -134,8 +149,6 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
               appName: settings.appName
           });
           
-          const itemListString = request.items.map(i => `• ${i.quantity}x ${i.itemName}`).join('\n');
-          
           // 3. Send via GAS Web App
           await fetch(settings.googleAppsScriptUrl, {
               method: 'POST',
@@ -143,13 +156,18 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
               headers: { 'Content-Type': 'text/plain' },
               body: JSON.stringify({
                   to_email: settings.notificationEmails,
-                  reference_code: request.referenceCode,
                   subject: `New Request: ${request.referenceCode} - ${request.borrowerName}`,
+                  
+                  // The updated GAS script uses 'body' for plain text and 'html_body' for HTML
+                  body: plainTextBody, 
+                  html_body: htmlBody,
+                  
+                  // Legacy fields in case script isn't updated yet (to prevent complete failure)
+                  reference_code: request.referenceCode,
                   borrower_name: request.borrowerName,
                   borrower_id: request.borrowerId,
                   return_date: request.returnDate,
-                  item_list: itemListString, // Fallback plain text
-                  html_body: htmlBody, // HTML Template
+                  item_list: itemListString,
                   app_name: settings.appName
               })
           });
