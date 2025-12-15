@@ -416,6 +416,44 @@ export const returnItem = async (
     }
 };
 
+export const consumeItem = async (itemId: string, quantityToConsume: number): Promise<{ success: boolean; message?: string }> => {
+    try {
+        const { data: rawItem, error: itemError } = await supabase
+            .from('inventory_items')
+            .select('*')
+            .eq('id', itemId)
+            .single();
+
+        if (itemError || !rawItem) throw new Error("Item not found");
+        
+        const item = parseInventoryItem(rawItem);
+        
+        // Ensure we don't consume borrowed items (only available stock)
+        const available = item.quantity - (item.borrowedQuantity || 0);
+        
+        if (quantityToConsume > available) {
+            throw new Error(`Cannot consume ${quantityToConsume}. Only ${available} available (some may be borrowed).`);
+        }
+
+        const newTotalQty = Math.max(0, item.quantity - quantityToConsume);
+
+        const { error: updateError } = await supabase
+            .from('inventory_items')
+            .update({
+                quantity: newTotalQty,
+                lastUpdated: new Date().toISOString()
+            })
+            .eq('id', itemId);
+
+        if (updateError) throw updateError;
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('Supabase Error (consumeItem):', error.message);
+        return { success: false, message: error.message };
+    }
+};
+
 export const returnItems = async (recordIds: string[]): Promise<{ success: boolean; message?: string }> => {
     try {
         // Process sequentially

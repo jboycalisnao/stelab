@@ -261,6 +261,24 @@ const App: React.FC = () => {
       }
   };
 
+  const handleConsume = async (item: InventoryItem) => {
+      const input = window.prompt(`Quick Use: ${item.name}\nHow much did you use? (Available: ${item.quantity - (item.borrowedQuantity || 0)})`);
+      if (!input) return;
+      
+      const qty = parseInt(input);
+      if (isNaN(qty) || qty <= 0) {
+          alert("Invalid quantity.");
+          return;
+      }
+
+      const result = await storage.consumeItem(item.id, qty);
+      if (result.success) {
+          await refreshData(true);
+      } else {
+          alert(result.message || "Failed to consume item.");
+      }
+  };
+
   const handleUnbox = async (item: InventoryItem, boxId: string) => {
       if (!item.boxes) return;
       
@@ -533,6 +551,7 @@ const App: React.FC = () => {
                                     onShowQR={setQrItem}
                                     onPrintBarcodes={setBarcodeItem}
                                     onBorrow={(item) => openBorrowModal(item)}
+                                    onConsume={handleConsume}
                                     initialSearchTerm={initialSearchTerm}
                                 />
                             )}

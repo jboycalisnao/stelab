@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { InventoryItem, ItemCondition, Category } from '../types';
-import { Edit2, Trash2, QrCode, Search, Filter, HandPlatter, Barcode, FileText, List, Printer, AlertTriangle, XCircle, Clipboard, ChevronDown, ChevronRight, Package, LayoutGrid } from 'lucide-react';
+import { Edit2, Trash2, QrCode, Search, Filter, HandPlatter, Barcode, FileText, List, Printer, AlertTriangle, XCircle, Clipboard, ChevronDown, ChevronRight, Package, LayoutGrid, Droplets, Minus } from 'lucide-react';
 import { getCategoryColor, getCategoryIcon } from '../constants';
 
 interface InventoryListProps {
@@ -11,10 +11,11 @@ interface InventoryListProps {
   onShowQR: (item: InventoryItem) => void;
   onBorrow: (item: InventoryItem) => void;
   onPrintBarcodes: (item: InventoryItem) => void;
+  onConsume?: (item: InventoryItem) => void;
   initialSearchTerm?: string;
 }
 
-const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit, onDelete, onShowQR, onBorrow, onPrintBarcodes, initialSearchTerm }) => {
+const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit, onDelete, onShowQR, onBorrow, onPrintBarcodes, onConsume, initialSearchTerm }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'report'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('All');
@@ -376,7 +377,14 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                                                         return (
                                                             <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
                                                                 <td className="px-6 py-3">
-                                                                    <div className="font-medium text-gray-900">{item.name}</div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="font-medium text-gray-900">{item.name}</div>
+                                                                        {item.isConsumable && (
+                                                                            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full border border-blue-200 font-bold flex items-center gap-1" title="Consumable Item">
+                                                                                <Droplets className="w-3 h-3" /> Consumable
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                     {item.shortId && <div className="text-[10px] text-gray-400 font-mono mt-0.5">{item.shortId}</div>}
                                                                     {item.description && <div className="text-xs text-gray-500 truncate max-w-[180px]">{item.description}</div>}
                                                                 </td>
@@ -401,6 +409,17 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                                                                 </td>
                                                                 <td className="px-6 py-3 text-right">
                                                                     <div className="flex justify-end space-x-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                                        {/* Consumable Quick Action */}
+                                                                        {item.isConsumable && onConsume && (
+                                                                            <button
+                                                                                onClick={() => onConsume(item)}
+                                                                                className="p-1.5 rounded-md transition-colors text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+                                                                                title="Quick Deduct (Consumed)"
+                                                                            >
+                                                                                <Minus className="w-4 h-4" />
+                                                                            </button>
+                                                                        )}
+                                                                        
                                                                         <button 
                                                                             onClick={() => onBorrow(item)}
                                                                             disabled={available <= 0}
