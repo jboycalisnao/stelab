@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, BorrowRequest, RequestItem } from '../types';
 import * as storage from '../services/storageService';
-import { X, Search, ShoppingBag, Plus, Trash2, ArrowRight, ArrowLeft, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, Search, ShoppingBag, Plus, Trash2, ArrowRight, ArrowLeft, CheckCircle, ChevronDown, ChevronRight, Mail } from 'lucide-react';
 import { getCategoryIcon, getCategoryColor } from '../constants';
 
 interface PublicRequestModalProps {
@@ -113,6 +113,45 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
       setSelectedItems(prev => prev.map(p => p.itemId === itemId ? { ...p, quantity: Math.min(qty, max) } : p));
   };
 
+  const sendNotificationEmail = async (request: BorrowRequest) => {
+      try {
+          // 1. Get Settings
+          const settings = await storage.getSettings();
+          
+          if (!settings.googleAppsScriptUrl || !settings.notificationEmails) {
+              console.warn("Gmail notification URL or recipients not configured.");
+              return;
+          }
+
+          // 2. Prepare Data
+          const itemListString = request.items.map(i => `• ${i.quantity}x ${i.itemName}`).join('\n');
+          
+          // 3. Send via GAS Web App
+          // Note: mode 'no-cors' is used to fire-and-forget without CORS errors blocking execution
+          await fetch(settings.googleAppsScriptUrl, {
+              method: 'POST',
+              mode: 'no-cors', 
+              headers: {
+                  'Content-Type': 'text/plain' // Avoid preflight
+              },
+              body: JSON.stringify({
+                  to_email: settings.notificationEmails,
+                  reference_code: request.referenceCode,
+                  borrower_name: request.borrowerName,
+                  borrower_id: request.borrowerId,
+                  return_date: request.returnDate,
+                  item_list: itemListString,
+                  app_name: settings.appName
+              })
+          });
+          
+          console.log("Notification request sent.");
+
+      } catch (error) {
+          console.error("Failed to send notification email", error);
+      }
+  };
+
   const handleSubmit = async () => {
       if (!borrowerName || !borrowerId || !returnDate || selectedItems.length === 0) return;
       
@@ -129,6 +168,9 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
       });
 
       if (newRequest) {
+          // Attempt to send email notification (fire and forget)
+          sendNotificationEmail(newRequest);
+          
           setCreatedRequest(newRequest);
           setStep(4);
       } else {
@@ -345,6 +387,11 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
                          <h3 className="text-3xl font-mono font-bold text-maroon-600 tracking-wider mb-4">{createdRequest.referenceCode}</h3>
                          <img src={qrUrl} alt="QR Code" className="w-48 h-48 mx-auto mix-blend-multiply" />
                          <p className="text-xs text-gray-400 mt-2">Scan to track status</p>
+                    </div>
+
+                    <div className="flex gap-2 items-center text-gray-500 text-sm bg-gray-50 p-2 rounded-lg">
+                        <Mail className="w-4 h-4" />
+                        Notification sent to admin.
                     </div>
 
                     <button onClick={onClose} className="px-8 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 shadow-md">

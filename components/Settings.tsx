@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AppSettings, Category } from '../types';
 import * as storage from '../services/storageService';
-import { Upload, Save, CheckCircle, Plus, Trash2, Edit2, X, Loader2, Type, Lock, User, Eye, EyeOff, Mail, Server, FileCode, Key } from 'lucide-react';
+import { Upload, Save, CheckCircle, Plus, Trash2, Edit2, X, Loader2, Type, Lock, User, Eye, EyeOff, Mail, Server, FileCode, Key, Users, Send, ExternalLink, Copy, Code } from 'lucide-react';
 
 interface SettingsProps {
   settings: AppSettings;
@@ -51,9 +51,34 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
   const [newCategory, setNewCategory] = useState('');
   const [editingCategory, setEditingCategory] = useState<{id: string, name: string} | null>(null);
   const [showAdminPassword, setShowAdminPassword] = useState(false);
-  const [showEmailJsKey, setShowEmailJsKey] = useState(false);
   
   const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const GAS_CODE = `function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var to = data.to_email;
+    var subject = "Lab Request: " + data.reference_code;
+    
+    var body = "New Borrow Request\\n" +
+               "----------------\\n" +
+               "Borrower: " + data.borrower_name + " (" + data.borrower_id + ")\\n" +
+               "Return Date: " + data.return_date + "\\n\\n" +
+               "Items Requested:\\n" + data.item_list + "\\n\\n" +
+               "This is an automated message from " + (data.app_name || "SciLab Inventory") + ".";
+               
+    if (to) {
+      MailApp.sendEmail(to, subject, body);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({result: 'success'}))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({result: 'error', error: error.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
 
   useEffect(() => {
     loadCategories();
@@ -117,6 +142,54 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
             setIsSaving(false);
         }
     }, 100);
+  };
+
+  const copyCodeToClipboard = () => {
+    navigator.clipboard.writeText(GAS_CODE);
+    alert("Code copied to clipboard!");
+  };
+
+  const handleTestEmail = async () => {
+      const { googleAppsScriptUrl, notificationEmails, recoveryEmail } = formData;
+      
+      if (!googleAppsScriptUrl) {
+          alert("Please provide the Google Apps Script Web App URL first.");
+          return;
+      }
+      
+      const recipient = notificationEmails?.split(',')[0].trim() || recoveryEmail;
+      if (!recipient) {
+          alert("Please enter a Notification Email or Recovery Email to receive the test.");
+          return;
+      }
+
+      setIsProcessing(true);
+      try {
+          // Send raw text body to avoid CORS preflight issues with application/json
+          await fetch(googleAppsScriptUrl, {
+              method: 'POST',
+              mode: 'no-cors', // Important for GAS interaction from browser
+              headers: {
+                  'Content-Type': 'text/plain'
+              },
+              body: JSON.stringify({
+                  to_email: recipient,
+                  reference_code: "TEST-CONNECTION",
+                  borrower_name: "System Admin (Test)",
+                  borrower_id: "ADMIN-TEST",
+                  return_date: new Date().toISOString().split('T')[0],
+                  item_list: "• Test Connection Item",
+                  app_name: formData.appName || "Lab System"
+              })
+          });
+          
+          alert(`Test request sent! Check ${recipient} in a few moments. If no email arrives, check your Script deployment settings.`);
+      } catch (e: any) {
+          console.error(e);
+          alert("Request failed: " + (e.message || "Unknown error"));
+      } finally {
+          setIsProcessing(false);
+      }
   };
 
   const handleAddCategory = async () => {
@@ -207,31 +280,68 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
                   </div>
                 </div>
 
-                {/* EmailJS */}
+                {/* Google Apps Script Integration */}
                 <div className="pt-4 border-t border-gray-100">
-                  <h4 className="text-md font-bold text-gray-800 mb-4 flex items-center gap-2"><Mail className="w-4 h-4 text-gray-500" />Email Service Configuration (EmailJS)</h4>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-md font-bold text-gray-800 flex items-center gap-2"><Mail className="w-4 h-4 text-gray-500" />Direct Gmail (via Apps Script)</h4>
+                  </div>
+                  
+                  {/* Setup Guide */}
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-4 text-sm text-blue-800 leading-relaxed">
+                    <p className="font-bold flex items-center gap-1 mb-2"><ExternalLink className="w-3 h-3"/> Setup Instructions:</p>
+                    <ol className="list-decimal list-inside space-y-1 ml-1 text-blue-700 text-xs">
+                        <li>Go to <a href="https://script.google.com/" target="_blank" rel="noreferrer" className="underline font-bold">script.google.com</a> and create a <strong>New Project</strong>.</li>
+                        <li>Paste the code below into the script editor (replace existing code).</li>
+                        <li>Click <strong>Deploy</strong> &gt; <strong>New deployment</strong>.</li>
+                        <li>Select type: <strong>Web app</strong>.</li>
+                        <li>Set <strong>Who has access</strong> to <strong>"Anyone"</strong> (Required).</li>
+                        <li>Click <strong>Deploy</strong> and copy the <strong>Web App URL</strong> below.</li>
+                    </ol>
+                    
+                    <div className="mt-3 relative">
+                        <pre className="bg-slate-800 text-green-400 p-3 rounded-md text-[10px] overflow-x-auto font-mono custom-scrollbar border border-slate-700">
+                            {GAS_CODE}
+                        </pre>
+                        <button 
+                            type="button" 
+                            onClick={copyCodeToClipboard}
+                            className="absolute top-2 right-2 p-1 bg-white/10 hover:bg-white/20 text-white rounded transition-colors"
+                            title="Copy Code"
+                        >
+                            <Copy className="w-3 h-3" />
+                        </button>
+                    </div>
+                  </div>
+
                   <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Service ID</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Web App URL</label>
                         <div className="relative">
-                            <input type="text" name="emailJsServiceId" value={formData.emailJsServiceId || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900" />
-                            <Server className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <input type="text" name="googleAppsScriptUrl" value={formData.googleAppsScriptUrl || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 font-mono text-xs" placeholder="https://script.google.com/macros/s/..." />
+                            <Code className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         </div>
                       </div>
+                      
+                      {/* Notification Recipients */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Template ID</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Notification Recipients</label>
                         <div className="relative">
-                            <input type="text" name="emailJsTemplateId" value={formData.emailJsTemplateId || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900" />
-                            <FileCode className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <input type="text" name="notificationEmails" value={formData.notificationEmails || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900" placeholder="admin@school.edu, teacher@school.edu" />
+                            <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         </div>
+                        <p className="text-xs text-gray-500 mt-1">Comma-separated email addresses to be notified when a new request is submitted.</p>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Public Key</label>
-                        <div className="relative">
-                            <input type={showEmailJsKey ? "text" : "password"} name="emailJsPublicKey" value={formData.emailJsPublicKey || ''} onChange={handleChange} className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900" />
-                            <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                            <button type="button" onClick={() => setShowEmailJsKey(!showEmailJsKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">{showEmailJsKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
-                        </div>
+
+                      <div className="pt-2">
+                        <button 
+                            type="button" 
+                            onClick={handleTestEmail}
+                            disabled={isProcessing || !formData.googleAppsScriptUrl}
+                            className="text-sm flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors border border-gray-300 font-medium disabled:opacity-50"
+                        >
+                             {isProcessing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4"/>}
+                             Test Connection
+                        </button>
                       </div>
                   </div>
                 </div>

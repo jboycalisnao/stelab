@@ -74,10 +74,9 @@ export interface AppSettings {
   adminPassword?: string;
   recoveryEmail?: string;
   
-  // EmailJS Configuration for Real Emails
-  emailJsServiceId?: string;
-  emailJsTemplateId?: string;
-  emailJsPublicKey?: string;
+  // Gmail Automation via Google Apps Script
+  googleAppsScriptUrl?: string; // The Web App URL deployed from Google Script
+  notificationEmails?: string; // Comma-separated list of emails to notify on new requests
 }
 
 export interface Category {
