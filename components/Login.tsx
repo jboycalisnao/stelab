@@ -5,13 +5,6 @@ import * as storage from '../services/storageService';
 import PublicRequestModal from './PublicRequestModal';
 import { getCategoryColor, getCategoryIcon } from '../constants';
 
-// Declare EmailJS global
-declare global {
-  interface Window {
-    emailjs: any;
-  }
-}
-
 interface LoginProps {
   appName: string;
   logoUrl?: string;
@@ -117,17 +110,27 @@ const Login: React.FC<LoginProps> = ({
       setIsTrackLoading(false);
   };
 
-  // --- Reset Password Logic (Same as before) ---
+  // --- Reset Password Logic ---
   const sendOtpEmail = async (email: string, otp: string) => {
-      if (!window.emailjs || !settings?.emailJsServiceId || !settings?.emailJsTemplateId || !settings?.emailJsPublicKey) {
-          throw new Error("Email service not configured. Please contact administrator to configure EmailJS in Settings.");
+      if (!settings?.googleAppsScriptUrl) {
+          throw new Error("Email service (Google Apps Script) not configured in Settings.");
       }
-      await window.emailjs.send(
-          settings.emailJsServiceId,
-          settings.emailJsTemplateId,
-          { to_email: email, otp: otp, to_name: 'Admin User' },
-          settings.emailJsPublicKey
-      );
+
+      const body = `Your Password Reset Code is: ${otp}\n\n` + 
+                   `If you did not request this, please ignore this email.\n\n` +
+                   `Sent from ${appName || 'SciLab Inventory System'}`;
+
+      // Use 'no-cors' to allow sending without preflight check errors
+      await fetch(settings.googleAppsScriptUrl, {
+          method: 'POST',
+          mode: 'no-cors', 
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+              to_email: email,
+              subject: "Password Reset Request",
+              body: body
+          })
+      });
   };
 
   const handleResetStep1 = async (e: React.FormEvent) => {

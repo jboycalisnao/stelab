@@ -58,16 +58,20 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
   try {
     var data = JSON.parse(e.postData.contents);
     var to = data.to_email;
-    var subject = "Lab Request: " + data.reference_code;
-    
-    var body = "New Borrow Request\\n" +
+    var subject = data.subject || ("Lab Request: " + (data.reference_code || "Unknown"));
+    var body = data.body || "";
+
+    // Fallback: Construct body if borrowing data is present but body is empty
+    if (!body && data.borrower_name) {
+       body = "New Borrow Request\\n" +
                "----------------\\n" +
                "Borrower: " + data.borrower_name + " (" + data.borrower_id + ")\\n" +
                "Return Date: " + data.return_date + "\\n\\n" +
                "Items Requested:\\n" + data.item_list + "\\n\\n" +
                "This is an automated message from " + (data.app_name || "SciLab Inventory") + ".";
-               
-    if (to) {
+    }
+
+    if (to && body) {
       MailApp.sendEmail(to, subject, body);
     }
     
@@ -174,12 +178,8 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
               },
               body: JSON.stringify({
                   to_email: recipient,
-                  reference_code: "TEST-CONNECTION",
-                  borrower_name: "System Admin (Test)",
-                  borrower_id: "ADMIN-TEST",
-                  return_date: new Date().toISOString().split('T')[0],
-                  item_list: "• Test Connection Item",
-                  app_name: formData.appName || "Lab System"
+                  subject: "Test Connection - SciLab Inventory",
+                  body: "This is a test email to verify your Google Apps Script connection is working correctly."
               })
           });
           
