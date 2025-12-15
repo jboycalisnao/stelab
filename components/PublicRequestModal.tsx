@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, BorrowRequest, RequestItem } from '../types';
 import * as storage from '../services/storageService';
+import { getBorrowRequestTemplate } from '../services/emailTemplates';
 import { X, Search, ShoppingBag, Plus, Trash2, ArrowRight, ArrowLeft, CheckCircle, ChevronDown, ChevronRight, Mail } from 'lucide-react';
 import { getCategoryIcon, getCategoryColor } from '../constants';
 
@@ -123,24 +124,32 @@ const PublicRequestModal: React.FC<PublicRequestModalProps> = ({ onClose }) => {
               return;
           }
 
-          // 2. Prepare Data
+          // 2. Prepare HTML Body
+          const htmlBody = getBorrowRequestTemplate({
+              borrowerName: request.borrowerName,
+              borrowerId: request.borrowerId,
+              referenceCode: request.referenceCode,
+              returnDate: request.returnDate,
+              items: request.items.map(i => ({ name: i.itemName, qty: i.quantity })),
+              appName: settings.appName
+          });
+          
           const itemListString = request.items.map(i => `• ${i.quantity}x ${i.itemName}`).join('\n');
           
           // 3. Send via GAS Web App
-          // Note: mode 'no-cors' is used to fire-and-forget without CORS errors blocking execution
           await fetch(settings.googleAppsScriptUrl, {
               method: 'POST',
               mode: 'no-cors', 
-              headers: {
-                  'Content-Type': 'text/plain' // Avoid preflight
-              },
+              headers: { 'Content-Type': 'text/plain' },
               body: JSON.stringify({
                   to_email: settings.notificationEmails,
                   reference_code: request.referenceCode,
+                  subject: `New Request: ${request.referenceCode} - ${request.borrowerName}`,
                   borrower_name: request.borrowerName,
                   borrower_id: request.borrowerId,
                   return_date: request.returnDate,
-                  item_list: itemListString,
+                  item_list: itemListString, // Fallback plain text
+                  html_body: htmlBody, // HTML Template
                   app_name: settings.appName
               })
           });

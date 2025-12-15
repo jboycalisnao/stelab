@@ -59,20 +59,17 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
     var data = JSON.parse(e.postData.contents);
     var to = data.to_email;
     var subject = data.subject || ("Lab Request: " + (data.reference_code || "Unknown"));
-    var body = data.body || "";
+    
+    // Support both plain text and HTML bodies
+    var body = data.body || " "; 
+    var htmlBody = data.html_body;
 
-    // Fallback: Construct body if borrowing data is present but body is empty
-    if (!body && data.borrower_name) {
-       body = "New Borrow Request\\n" +
-               "----------------\\n" +
-               "Borrower: " + data.borrower_name + " (" + data.borrower_id + ")\\n" +
-               "Return Date: " + data.return_date + "\\n\\n" +
-               "Items Requested:\\n" + data.item_list + "\\n\\n" +
-               "This is an automated message from " + (data.app_name || "SciLab Inventory") + ".";
-    }
-
-    if (to && body) {
-      MailApp.sendEmail(to, subject, body);
+    if (to) {
+      if (htmlBody) {
+        GmailApp.sendEmail(to, subject, body, { htmlBody: htmlBody });
+      } else {
+        GmailApp.sendEmail(to, subject, body);
+      }
     }
     
     return ContentService.createTextOutput(JSON.stringify({result: 'success'}))
@@ -179,7 +176,8 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
               body: JSON.stringify({
                   to_email: recipient,
                   subject: "Test Connection - SciLab Inventory",
-                  body: "This is a test email to verify your Google Apps Script connection is working correctly."
+                  body: "This is a test email to verify your Google Apps Script connection is working correctly.",
+                  html_body: "<h3>Test Successful</h3><p>Your Google Apps Script connection is working correctly.</p>"
               })
           });
           

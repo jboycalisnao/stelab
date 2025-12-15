@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FlaskConical, Lock, User, AlertCircle, Eye, EyeOff, Mail, ArrowRight, ArrowLeft, KeyRound, Loader2, Send, ShoppingBag, Search, QrCode, MapPin, Activity, Box, Tag } from 'lucide-react';
 import { AppSettings, BorrowRequest, InventoryItem } from '../types';
 import * as storage from '../services/storageService';
+import { getPasswordResetTemplate } from '../services/emailTemplates';
 import PublicRequestModal from './PublicRequestModal';
 import { getCategoryColor, getCategoryIcon } from '../constants';
 
@@ -116,6 +117,13 @@ const Login: React.FC<LoginProps> = ({
           throw new Error("Email service (Google Apps Script) not configured in Settings.");
       }
 
+      // Generate HTML Body
+      const htmlBody = getPasswordResetTemplate({
+          code: otp,
+          appName: appName || 'SciLab Inventory System'
+      });
+      
+      // Fallback text
       const body = `Your Password Reset Code is: ${otp}\n\n` + 
                    `If you did not request this, please ignore this email.\n\n` +
                    `Sent from ${appName || 'SciLab Inventory System'}`;
@@ -128,7 +136,8 @@ const Login: React.FC<LoginProps> = ({
           body: JSON.stringify({
               to_email: email,
               subject: "Password Reset Request",
-              body: body
+              body: body,
+              html_body: htmlBody
           })
       });
   };
