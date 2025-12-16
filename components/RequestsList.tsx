@@ -189,92 +189,141 @@ const RequestsList: React.FC<RequestsListProps> = () => {
       );
   };
 
-  const handlePrintSlip = (req: BorrowRequest) => {
-      // Directs to the current app status page
+  const handlePrintSlip = async (req: BorrowRequest) => {
+      // Fetch settings for Logo and School Name
+      const settings = await storage.getSettings();
+      
       const trackingUrl = `${window.location.origin}?ref=${req.referenceCode}`;
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(trackingUrl)}`;
       
-      const printWindow = window.open('', '', 'height=600,width=800');
+      const printWindow = window.open('', '', 'height=900,width=800');
       if (printWindow) {
-          printWindow.document.write('<html><head><title>Borrow Slip</title>');
+          printWindow.document.write('<html><head><title>Borrower Form</title>');
           printWindow.document.write(`
             <style>
                 @media print {
-                    @page { size: A5 landscape; margin: 0; }
+                    @page { size: A4; margin: 2cm; }
                     body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
                 }
-                body { font-family: 'Segoe UI', sans-serif; color: #1f2937; background: white; }
-                .slip-container { 
-                    width: 210mm; /* A5 Landscape Width */
-                    height: 148mm; /* A5 Landscape Height */
-                    padding: 20px 30px; 
-                    box-sizing: border-box;
-                    display: flex;
-                    flex-direction: column;
-                }
-                .header { border-bottom: 2px solid #2563eb; padding-bottom: 8px; margin-bottom: 15px; text-align: center; }
-                .header h1 { margin: 0; font-size: 1.4em; color: #1e3a8a; }
-                .header p { margin: 2px 0 0; color: #6b7280; font-size: 0.8em; text-transform: uppercase; letter-spacing: 1.5px; }
+                body { font-family: sans-serif; color: #000; background: white; line-height: 1.4; }
+                .container { width: 100%; max-width: 210mm; margin: 0 auto; }
                 
-                .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; font-size: 0.85em; }
-                .meta-item label { display: block; font-weight: bold; color: #4b5563; font-size: 0.7em; text-transform: uppercase; margin-bottom: 1px; }
-                .meta-item div { font-weight: 500; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px; }
+                /* Header */
+                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; }
+                .logo { height: 60px; width: auto; margin-bottom: 10px; }
+                .header h1 { margin: 0; font-size: 18pt; text-transform: uppercase; letter-spacing: 1px; }
+                .header p { margin: 2px 0; font-size: 10pt; }
+                .form-title { text-align: center; font-weight: bold; font-size: 14pt; margin: 20px 0; text-decoration: underline; }
 
-                .items-table-container { flex: 1; min-height: 50px; }
-                table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
-                th { background: #f3f4f6; text-align: left; padding: 6px; border-bottom: 2px solid #e5e7eb; text-transform: uppercase; font-size: 0.75em; color: #4b5563; }
-                td { padding: 6px; border-bottom: 1px solid #e5e7eb; }
-                
-                .footer-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 10px; }
-                
-                .signatures { display: flex; gap: 30px; flex: 1; }
-                .signature-box { flex: 1; }
-                .signature-line { width: 100%; border-top: 1px solid #000; margin-top: 35px; padding-top: 5px; font-size: 0.7em; text-align: center; text-transform: uppercase; color: #4b5563; }
-                
-                .qr-section { width: 100px; text-align: center; margin-left: 20px; flex-shrink: 0; }
-                .qr-section img { width: 80px; height: 80px; }
-                .qr-section .code { font-family: monospace; font-weight: bold; font-size: 0.9em; margin-top: 2px; color: #1f2937; }
-                .qr-scan-hint { font-size: 0.6em; color: #6b7280; margin-top: 2px; }
+                /* Info Grid */
+                .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; font-size: 11pt; }
+                .info-row { display: flex; margin-bottom: 5px; }
+                .label { font-weight: bold; width: 130px; }
+                .value { border-bottom: 1px solid #999; flex: 1; padding-left: 5px; }
+
+                /* Items Table */
+                table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 10pt; }
+                th, td { border: 1px solid #000; padding: 8px; }
+                th { background-color: #f0f0f0; text-transform: uppercase; font-weight: bold; }
+                .text-center { text-align: center; }
+                .text-right { text-align: right; }
+
+                /* Terms */
+                .terms { font-size: 9pt; margin-bottom: 30px; text-align: justify; }
+                .terms h3 { font-size: 10pt; text-transform: uppercase; margin-bottom: 5px; }
+                .terms ol { padding-left: 20px; margin-top: 5px; }
+                .terms li { margin-bottom: 4px; }
+
+                /* Signatures */
+                .signatures { display: flex; justify-content: space-between; margin-top: 50px; font-size: 11pt; }
+                .sig-block { width: 45%; }
+                .sig-line { border-top: 1px solid #000; margin-top: 40px; text-align: center; padding-top: 5px; font-weight: bold; text-transform: uppercase; }
+                .sig-role { text-align: center; font-size: 9pt; font-style: italic; }
+
+                /* Footer/QR */
+                .footer { margin-top: 30px; border-top: 1px dashed #999; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 8pt; color: #555; }
+                .qr-box { text-align: center; }
+                .qr-box img { width: 60px; height: 60px; }
             </style>
           `);
           printWindow.document.write('</head><body>');
           printWindow.document.write(`
-            <div class="slip-container">
+            <div class="container">
                 <div class="header">
-                    <h1>Equipment Borrow Slip</h1>
-                    <p>Laboratory Inventory System</p>
+                    ${settings.logoUrl ? `<img src="${settings.logoUrl}" class="logo" />` : ''}
+                    <h1>${settings.appName}</h1>
+                    <p>Science Laboratory Department</p>
                 </div>
 
-                <div class="meta-grid">
-                    <div class="meta-item"><label>Reference Code</label><div>${req.referenceCode}</div></div>
-                    <div class="meta-item"><label>Date Requested</label><div>${new Date(req.requestDate).toLocaleDateString()}</div></div>
-                    <div class="meta-item"><label>Borrower Name</label><div>${req.borrowerName}</div></div>
-                    <div class="meta-item"><label>ID / Section</label><div>${req.borrowerId}</div></div>
-                    <div class="meta-item"><label>Expected Return</label><div>${req.returnDate}</div></div>
-                </div>
+                <div class="form-title">EQUIPMENT BORROWER'S FORM</div>
 
-                <div class="items-table-container">
-                    <table>
-                        <thead><tr><th>Item Name</th><th style="text-align:right">Qty</th></tr></thead>
-                        <tbody>
-                            ${req.items.map(i => `<tr><td>${i.itemName}</td><td style="text-align:right">${i.quantity}</td></tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="footer-row">
-                    <div class="signatures">
-                        <div class="signature-box">
-                            <div class="signature-line">Borrower Signature</div>
-                        </div>
-                        <div class="signature-box">
-                            <div class="signature-line">Lab Admin Approval</div>
-                        </div>
+                <div class="info-grid">
+                    <div>
+                        <div class="info-row"><span class="label">Borrower Name:</span><span class="value">${req.borrowerName}</span></div>
+                        <div class="info-row"><span class="label">ID / Section:</span><span class="value">${req.borrowerId}</span></div>
+                        <div class="info-row"><span class="label">Contact Info:</span><span class="value">${req.borrowerEmail || 'N/A'}</span></div>
                     </div>
-                    <div class="qr-section">
+                    <div>
+                        <div class="info-row"><span class="label">Reference No:</span><span class="value"><strong>${req.referenceCode}</strong></span></div>
+                        <div class="info-row"><span class="label">Date Requested:</span><span class="value">${new Date(req.requestDate).toLocaleDateString()}</span></div>
+                        <div class="info-row"><span class="label">Due Date:</span><span class="value">${req.returnDate}</span></div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 50%">Item Description / Equipment Name</th>
+                            <th style="width: 15%" class="text-center">Quantity</th>
+                            <th style="width: 35%">Remarks / Condition Issued</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${req.items.map(i => `
+                            <tr>
+                                <td>${i.itemName}</td>
+                                <td class="text-center"><strong>${i.quantity}</strong></td>
+                                <td>Good Working Condition</td>
+                            </tr>
+                        `).join('')}
+                        <!-- Empty rows for manual additions if needed -->
+                        <tr><td>&nbsp;</td><td></td><td></td></tr>
+                        <tr><td>&nbsp;</td><td></td><td></td></tr>
+                    </tbody>
+                </table>
+
+                <div class="terms">
+                    <h3>Terms and Conditions</h3>
+                    <ol>
+                        <li><strong>Receipt & Inspection:</strong> I acknowledge that I have received the equipment listed above in good working condition and free from defects, unless otherwise noted in the "Remarks" column.</li>
+                        <li><strong>Usage:</strong> I agree to use the equipment solely for educational or approved laboratory purposes and in accordance with all safety guidelines and instructions provided.</li>
+                        <li><strong>Care & Custody:</strong> I will maintain the equipment in a secure manner and take all reasonable precautions to prevent loss, theft, or damage while it is in my possession.</li>
+                        <li><strong>Liability & Replacement:</strong> I understand that I am financially responsible for this equipment. In the event of loss, theft, or damage due to negligence or misuse, I agree to replace the item(s) with the same model/specifications or pay the full replacement cost as determined by the Laboratory Office.</li>
+                        <li><strong>Return Policy:</strong> I will return all items by the specified Due Date. I understand that late returns may result in disciplinary action or suspension of borrowing privileges.</li>
+                    </ol>
+                </div>
+
+                <div class="signatures">
+                    <div class="sig-block">
+                        <p>Borrowed by:</p>
+                        <div class="sig-line">${req.borrowerName}</div>
+                        <div class="sig-role">Signature over Printed Name</div>
+                    </div>
+                    <div class="sig-block">
+                        <p>Approved / Issued by:</p>
+                        <div class="sig-line">&nbsp;</div>
+                        <div class="sig-role">Laboratory In-Charge / Custodian</div>
+                    </div>
+                </div>
+
+                <div class="footer">
+                    <div>
+                        System Generated Form • ${settings.appName}<br>
+                        Printed on: ${new Date().toLocaleString()}
+                    </div>
+                    <div class="qr-box">
                         <img src="${qrUrl}" />
-                        <div class="code">${req.referenceCode}</div>
-                        <div class="qr-scan-hint">Scan to Track</div>
+                        <br>${req.referenceCode}
                     </div>
                 </div>
             </div>
@@ -363,7 +412,7 @@ const RequestsList: React.FC<RequestsListProps> = () => {
                                     <button 
                                         onClick={() => handlePrintSlip(req)}
                                         className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
-                                        title="Print Slip"
+                                        title="Print Form"
                                     >
                                         <Printer className="w-4 h-4" />
                                     </button>
