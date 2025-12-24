@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
+import * as sync from './services/syncService';
 import { supabase } from './supabaseClient';
 import Dashboard from './components/Dashboard';
 import InventoryList from './components/InventoryList';
@@ -15,7 +17,7 @@ import Login from './components/Login';
 import Scanner from './components/Scanner';
 import RequestsList from './components/RequestsList';
 import ConfirmModal from './components/ConfirmModal';
-import { LayoutDashboard, List, Plus, FlaskConical, HandPlatter, Settings as SettingsIcon, LogOut, ScanLine, Loader2, Inbox } from 'lucide-react';
+import { LayoutDashboard, List, Plus, FlaskConical, HandPlatter, Settings as SettingsIcon, LogOut, ScanLine, Loader2, Inbox, RefreshCw } from 'lucide-react';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -24,6 +26,7 @@ const App: React.FC = () => {
   // Loading UX State
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [loadingStatus, setLoadingStatus] = useState("Initializing system...");
+  const [lastSynced, setLastSynced] = useState<Date>(new Date());
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [borrowRecords, setBorrowRecords] = useState<BorrowRecord[]>([]);
@@ -68,12 +71,10 @@ const App: React.FC = () => {
   const refreshData = React.useCallback(async (silent = false) => {
       if (!silent) setIsLoading(true);
       try {
-          // Step 1: Load Settings first to show branding on splash screen immediately
           if (!silent) setLoadingStatus("Loading configuration...");
           const loadedSettings = await storage.getSettings();
           if (!silent) setSettings(loadedSettings);
 
-          // Step 2: Load Core Data
           if (!silent) setLoadingStatus("Syncing inventory database...");
           const [loadedItems, loadedRecords, loadedCats, loadedRequests] = await Promise.all([
               storage.getInventory(),
@@ -86,6 +87,7 @@ const App: React.FC = () => {
           setBorrowRecords(loadedRecords);
           setCategories(loadedCats);
           setRequests(loadedRequests);
+          setLastSynced(new Date());
           
           if (!silent) setLoadingStatus("Ready");
       } catch (e) {
@@ -104,7 +106,8 @@ const App: React.FC = () => {
     
     // Initial Load Sequence
     refreshData(false).then(() => {
-        // Add a small delay for the splash screen to look smooth and allow branding to be read
+        // Run maintenance sync on startup to catch up on time passed while "not in use"
+        sync.performMaintenanceSync();
         setTimeout(() => {
             setIsFirstLoad(false);
         }, 1200);
@@ -119,8 +122,16 @@ const App: React.FC = () => {
         supabase.channel('public:borrow_requests').on('postgres_changes', { event: '*', schema: 'public', table: 'borrow_requests' }, () => refreshData(true)).subscribe(),
     ];
 
+    // Setup Hourly Auto-Refresh (3600000ms = 1 hour)
+    // This ensures data is refreshed even if no real-time changes were pushed.
+    const cleanupRefresh = sync.setupAutoRefresh(() => {
+        refreshData(true);
+        sync.performMaintenanceSync();
+    }, 3600000);
+
     return () => {
         channels.forEach(ch => supabase.removeChannel(ch));
+        cleanupRefresh();
     };
   }, [refreshData]);
 
@@ -132,7 +143,6 @@ const App: React.FC = () => {
         if (viewItem) {
             setInitialSearchTerm(viewItem);
             setView('inventory');
-            // Clean URL to prevent loop/clutter
             window.history.replaceState({}, '', window.location.pathname);
         }
     }
@@ -142,14 +152,14 @@ const App: React.FC = () => {
     const handleResize = () => {
         const mobile = window.innerWidth < 768;
         setIsMobile(mobile);
-        if (mobile) {
+        if (mobile && view === 'dashboard') {
             setView('scanner');
         }
     };
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     if (!settings) return;
@@ -374,18 +384,13 @@ const App: React.FC = () => {
     setIsBorrowModalOpen(true);
   };
 
-  // --- ENHANCED LOADING SCREEN ---
   if (isFirstLoad) {
       return (
           <div className="fixed inset-0 bg-slate-900 flex items-center justify-center z-50 overflow-hidden">
-              {/* Background Effects */}
               <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#0f172a] to-slate-900 animate-pulse"></div>
               <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '32px 32px' }}></div>
               
-              {/* Glass Card */}
               <div className="relative bg-white/5 backdrop-blur-2xl border border-white/10 p-10 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm w-full mx-4 animate-in zoom-in fade-in duration-700 slide-in-from-bottom-8">
-                  
-                  {/* Logo Container */}
                   <div className="mb-8 relative group">
                       <div className="absolute inset-0 bg-blue-500 blur-3xl opacity-20 rounded-full animate-pulse group-hover:opacity-30 transition-opacity"></div>
                       <div className="relative z-10 p-5 bg-gradient-to-tr from-white/10 to-white/5 rounded-2xl border border-white/20 shadow-lg">
@@ -397,7 +402,6 @@ const App: React.FC = () => {
                       </div>
                   </div>
 
-                  {/* App Title */}
                   <h1 className="text-2xl font-bold text-white mb-2 tracking-tight text-center">
                       {settings?.appName || 'SciLab Inventory Pro'}
                   </h1>
@@ -405,7 +409,6 @@ const App: React.FC = () => {
                       Laboratory Management System
                   </p>
 
-                  {/* Progress Loader */}
                   <div className="w-full space-y-4">
                       <div className="flex justify-between text-[10px] uppercase font-bold text-blue-200/60 font-mono px-1">
                           <span>{loadingStatus}</span>
@@ -459,7 +462,6 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen text-gray-800 bg-transparent">
-      {/* Sidebar with increased opacity for contrast against dark background */}
       <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col h-full shadow-xl z-20">
         <div className="p-6 border-b border-gray-100 flex-shrink-0">
            <AppBrand />
@@ -485,7 +487,13 @@ const App: React.FC = () => {
           </button>
         </nav>
         <div className="p-4 border-t border-gray-100 flex-shrink-0">
-            {settings?.customFooterText && <div className="text-[10px] text-gray-400 mb-4 text-center px-2 font-medium uppercase tracking-wide">{settings.customFooterText}</div>}
+            <div className="flex flex-col items-center gap-1 mb-4">
+                 {settings?.customFooterText && <div className="text-[10px] text-gray-400 text-center px-2 font-medium uppercase tracking-wide">{settings.customFooterText}</div>}
+                 <div className="text-[9px] text-gray-400 font-mono flex items-center gap-1">
+                     <RefreshCw className={`w-2 h-2 ${isLoading ? 'animate-spin' : ''}`} />
+                     Last Synced: {lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                 </div>
+            </div>
             <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-colors font-medium">
                 <LogOut className="w-5 h-5" /><span>Log Out</span>
             </button>
@@ -498,20 +506,13 @@ const App: React.FC = () => {
                 {settings?.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded-md" /> : <div className="bg-blue-600 p-1.5 rounded-lg text-white"><FlaskConical className="w-5 h-5" /></div>}
                 <span className="font-bold truncate max-w-[150px] text-gray-800">{settings?.appName}</span>
              </div>
-             {!isMobile ? (
-                <div className="flex space-x-2">
-                    <button onClick={() => setView('dashboard')} className={`p-2 rounded ${view === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}><LayoutDashboard className="w-5 h-5"/></button>
-                    <button onClick={() => setView('scanner')} className={`p-2 rounded ${view === 'scanner' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}><ScanLine className="w-5 h-5"/></button>
-                    <button onClick={() => setView('lending')} className={`p-2 rounded ${view === 'lending' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}><HandPlatter className="w-5 h-5"/></button>
-                    <button onClick={handleLogout} className="p-2 rounded text-red-500"><LogOut className="w-5 h-5"/></button>
-                </div>
-             ) : (
+             <div className="flex items-center gap-2">
+                 <button onClick={() => refreshData(true)} className={`p-2 rounded-full text-gray-500 hover:bg-gray-100 ${isLoading ? 'animate-spin' : ''}`} title="Refresh Database"><RefreshCw className="w-5 h-5"/></button>
                  <button onClick={handleLogout} className="p-2 rounded text-red-500/80 hover:bg-red-50"><LogOut className="w-5 h-5"/></button>
-             )}
+             </div>
         </header>
 
         <div className="flex-1 overflow-y-auto">
-            {/* Main Content Header with distinct background */}
             <div className="bg-white border-b border-gray-200 px-6 py-6 md:px-8 mb-6 sticky top-0 z-10 shadow-sm">
                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
