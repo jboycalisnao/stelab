@@ -15,10 +15,13 @@ const sanitizeText = (text: string | undefined | null): string => {
     return text
         // Remove standard metadata blocks
         .replace(/<!--SYSTEM_META:[\s\S]*?-->/g, '')
-        // Remove leaked AppSettings JSON (specifically targets the user's reported issue)
+        // Remove leaked AppSettings JSON or broken metadata tags
         .replace(/\{"googleAppsScriptUrl":[\s\S]*?-->/g, '')
+        .replace(/\{"notificationEmails":[\s\S]*?-->/g, '')
         // Remove any other leaked JSON-like metadata that might have lost its start tag
         .replace(/\{"(maxBorrowable|isConsumable|boxes)":[\s\S]*?-->/g, '')
+        // General cleanup for any residual closing tags
+        .replace(/-->/g, '')
         .trim();
 };
 
@@ -150,7 +153,8 @@ export const syncOverdueStatus = async (): Promise<{ updated: number }> => {
         if (error) throw error;
         if (!overdueRecords || overdueRecords.length === 0) return { updated: 0 };
 
-        const ids = overdueRecords.map(r => r.id);
+        // Fix: Explicitly type 'r' as { id: string } to resolve TS7006 error
+        const ids = overdueRecords.map((r: { id: string }) => r.id);
         const { error: updateError } = await supabase
             .from('borrow_records')
             .update({ status: 'Overdue' })
@@ -371,9 +375,13 @@ export const getSettings = async (): Promise<AppSettings> => {
     try {
         const { data } = await supabase.from('app_settings').select('*').single();
         if (data) {
-            // Clean fields in case they were corrupted with metadata
+            // Scrub fields thoroughly to prevent metadata leaks on landing page
             if (data.customFooterText) data.customFooterText = sanitizeText(data.customFooterText);
             if (data.appName) data.appName = sanitizeText(data.appName);
+            // Ensure any accidentally saved JSON is stripped from other potential landing page fields
+            if (data.logoUrl && data.logoUrl.includes('googleAppsScriptUrl')) {
+                 data.logoUrl = sanitizeText(data.logoUrl);
+            }
         }
         return data || { appName: 'STE Laboratory Inventory System' };
     } catch (error: any) {
