@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
@@ -52,10 +51,10 @@ const App: React.FC = () => {
 
   // Dynamically update document title (Tab Name)
   useEffect(() => {
-    if (settings?.appName) {
+    if (settings && settings.appName) {
       document.title = settings.appName;
     }
-  }, [settings?.appName]);
+  }, [settings]);
 
   const refreshData = useCallback(async (silent = false) => {
       if (!silent) setIsLoading(true);
@@ -66,7 +65,7 @@ const App: React.FC = () => {
 
           if (!connected) {
               if (!silent) setLoadingStatus("Database Connection Failure");
-              throw new Error("Cloud inaccessible");
+              return;
           }
 
           if (!silent) setLoadingStatus("Pulling Live Configuration...");

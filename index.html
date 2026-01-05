@@ -6,48 +6,20 @@
     <title>SciLab Inventory Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+      // Polyfill for process.env to support Gemini SDK and other Node-centric libraries
+      window.process = { env: { API_KEY: "" } };
+      
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              // Custom School Brand Palette
-              // Secondary Accent: #2005A2 (Blue/Purple) - Mapped to 'blue'
               blue: {
-                50: '#eff1ff',
-                100: '#e1e4ff',
-                200: '#c6ccff',
-                300: '#a3adff',
-                400: '#7e87ff',
-                500: '#585aff',
-                600: '#2005A2', 
-                700: '#1a0482',
-                800: '#16036b',
-                900: '#140356',
+                50: '#eff1ff', 100: '#e1e4ff', 200: '#c6ccff', 300: '#a3adff', 400: '#7e87ff', 500: '#585aff',
+                600: '#2005A2', 700: '#1a0482', 800: '#16036b', 900: '#140356',
               },
-              // Main Accent: #AF1456 (Rubine Red) - Mapped to 'maroon'
               maroon: {
-                50: '#fdf2f7',
-                100: '#fce7f1',
-                200: '#fad0e2',
-                300: '#f7a8c8',
-                400: '#f074a3',
-                500: '#e54580',
-                600: '#AF1456', 
-                700: '#900d43',
-                800: '#780f3b',
-                900: '#651034',
-              },
-              red: {
-                50: '#fdf2f7',
-                100: '#fce7f1',
-                200: '#fad0e2',
-                300: '#f7a8c8',
-                400: '#f074a3',
-                500: '#e54580',
-                600: '#AF1456', 
-                700: '#900d43',
-                800: '#780f3b',
-                900: '#651034',
+                50: '#fdf2f7', 100: '#fce7f1', 200: '#fad0e2', 300: '#f7a8c8', 400: '#f074a3', 500: '#e54580',
+                600: '#AF1456', 700: '#900d43', 800: '#780f3b', 900: '#651034',
               }
             }
           }
@@ -63,48 +35,46 @@
         50% { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
       }
-
       body {
         font-family: 'Inter', sans-serif;
         background: linear-gradient(-45deg, #f3f4f6, #e2e8f0, #f8fafc, #ffffff);
         background-size: 400% 400%;
         animation: gradientBG 15s ease infinite;
         min-height: 100vh;
-        color: #1f2937;
         margin: 0;
       }
-      
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+      #root:empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
       }
-      ::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.05); 
+      #root:empty::after {
+        content: "Loading SciLab Pro...";
+        font-weight: 600;
+        color: #64748b;
+        animation: pulse 2s infinite;
       }
-      ::-webkit-scrollbar-thumb {
-        background: rgba(0, 0, 0, 0.2); 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: rgba(0, 0, 0, 0.3); 
-      }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
-    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
-    "vite": "https://aistudiocdn.com/vite@^7.2.6",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.0"
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "@google/genai": "https://esm.sh/@google/genai@1.30.0",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0",
+    "recharts": "https://esm.sh/recharts@2.13.3",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.46.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
-</head>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
