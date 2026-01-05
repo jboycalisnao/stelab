@@ -15,7 +15,9 @@
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "recharts": "^2.15.0"
+    "recharts": "^2.15.0",
+    "jsbarcode": "^3.11.5",
+    "html5-qrcode": "^2.3.8"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
