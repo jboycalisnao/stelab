@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
@@ -59,7 +58,9 @@ const App: React.FC = () => {
 
           if (!connected) {
               if (!silent) setLoadingStatus("Database Connection Failure");
-              throw new Error("Cloud inaccessible");
+              // We do not throw here, we just set the state so the UI can handle it gracefully
+              setIsLoading(false);
+              return false;
           }
 
           if (!silent) setLoadingStatus("Pulling Live Configuration...");
@@ -81,9 +82,12 @@ const App: React.FC = () => {
           setLastSynced(new Date());
           
           if (!silent) setLoadingStatus("Ready");
+          return true;
       } catch (e: any) {
           console.error("Critical Cloud Failure", e);
           setIsDbConnected(false);
+          if (!silent) setIsLoading(false);
+          return false;
       } finally {
           if (!silent) setIsLoading(false);
       }
@@ -93,29 +97,39 @@ const App: React.FC = () => {
     const auth = localStorage.getItem('scilab_auth');
     if (auth === 'true') setIsAuthenticated(true);
     
-    refreshData(false).then(() => {
-        sync.performMaintenanceSync();
+    refreshData(false)
+      .then((success) => {
+        if (success) {
+            sync.performMaintenanceSync();
+        }
         setTimeout(() => setIsFirstLoad(false), 800);
-    });
+      });
 
-    const channels = [
-        supabase.channel('public:inventory_items').on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, () => refreshData(true)).subscribe(),
-        supabase.channel('public:borrow_records').on('postgres_changes', { event: '*', schema: 'public', table: 'borrow_records' }, () => refreshData(true)).subscribe(),
-        supabase.channel('public:app_settings').on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => refreshData(true)).subscribe(),
-        supabase.channel('public:categories').on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => refreshData(true)).subscribe(),
-        supabase.channel('public:borrow_requests').on('postgres_changes', { event: '*', schema: 'public', table: 'borrow_requests' }, () => refreshData(true)).subscribe(),
-    ];
+    // Subscriptions only if database is present
+    let channels: any[] = [];
+    if (isDbConnected) {
+        channels = [
+            supabase.channel('public:inventory_items').on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, () => refreshData(true).catch(() => {})).subscribe(),
+            supabase.channel('public:borrow_records').on('postgres_changes', { event: '*', schema: 'public', table: 'borrow_records' }, () => refreshData(true).catch(() => {})).subscribe(),
+            supabase.channel('public:app_settings').on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => refreshData(true).catch(() => {})).subscribe(),
+            supabase.channel('public:categories').on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => refreshData(true).catch(() => {})).subscribe(),
+            supabase.channel('public:borrow_requests').on('postgres_changes', { event: '*', schema: 'public', table: 'borrow_requests' }, () => refreshData(true).catch(() => {})).subscribe(),
+        ];
+    }
 
     const cleanupRefresh = sync.setupAutoRefresh(() => {
-        refreshData(true);
-        sync.performMaintenanceSync();
+        if (isDbConnected) {
+            refreshData(true).then((success) => {
+                if (success) sync.performMaintenanceSync();
+            }).catch(() => {});
+        }
     }, 300000); // 5 min auto-refresh
 
     return () => {
         channels.forEach(ch => supabase.removeChannel(ch));
         cleanupRefresh();
     };
-  }, [refreshData]);
+  }, [refreshData, isDbConnected]);
 
   const sendStatusUpdateEmail = async (borrowerEmail: string, borrowerName: string, status: 'Approved' | 'Released' | 'Rejected' | 'Returned', items: {name: string, qty: number}[], returnDate: string) => {
       if (!borrowerEmail || !settings?.googleAppsScriptUrl) return;
@@ -194,7 +208,7 @@ const App: React.FC = () => {
   const handleSave = async (item: InventoryItem) => {
     const result = await storage.saveItem(item);
     if (result.success) {
-        await refreshData(true);
+        await refreshData(true).catch(() => {});
         setIsFormOpen(false);
         setEditingItem(undefined);
     } else {
@@ -205,7 +219,7 @@ const App: React.FC = () => {
   const handleDelete = async (id: string) => {
     confirmAction("Delete Equipment", "Permanently remove this item from the cloud? This action is absolute.", async () => {
         await storage.deleteItem(id);
-        await refreshData(true);
+        await refreshData(true).catch(() => {});
     }, true);
   };
 
@@ -215,7 +229,7 @@ const App: React.FC = () => {
         "Permanently remove this borrowing record? This will NOT restore inventory. Use Return if the item was physically returned.",
         async () => {
             await storage.deleteBorrowRecord(id);
-            await refreshData(true);
+            await refreshData(true).catch(() => {});
         },
         true
       );
@@ -229,7 +243,7 @@ const App: React.FC = () => {
             for (const id of ids) {
                 await storage.deleteBorrowRecord(id);
             }
-            await refreshData(true);
+            await refreshData(true).catch(() => {});
         },
         true
       );
@@ -238,7 +252,7 @@ const App: React.FC = () => {
   const handleBorrowConfirm = async (item: InventoryItem, bName: string, bId: string, qty: number, dDate: string, borrowerEmail?: string, sId?: string) => {
     const result = await storage.borrowItem(item.id, bName, bId, qty, dDate, borrowerEmail, sId);
     if (result.success) {
-        await refreshData(true);
+        await refreshData(true).catch(() => {});
         setIsBorrowModalOpen(false);
     } else {
         alert(result.message || "Failed to commit loan to cloud.");
@@ -267,7 +281,7 @@ const App: React.FC = () => {
                   new Date().toLocaleDateString()
               );
           }
-          await refreshData(true);
+          await refreshData(true).catch(() => {});
           setReturnModalState({ isOpen: false });
       } else {
           alert(result.message || "Failed to finalize return in cloud.");
@@ -304,7 +318,7 @@ const App: React.FC = () => {
                   <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
                   <h2 className="text-2xl font-bold text-gray-800 mb-2">System Disconnected</h2>
                   <p className="text-gray-500 mb-8">This application is strictly cloud-dependent. A connection to the Supabase database is required to proceed. Please check your internet or project status.</p>
-                  <button onClick={() => refreshData(false)} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 flex items-center justify-center gap-2">
+                  <button onClick={() => refreshData(false).catch(() => {})} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 flex items-center justify-center gap-2">
                       <RefreshCw className="w-5 h-5" /> Reconnect Now
                   </button>
               </div>
@@ -339,7 +353,7 @@ const App: React.FC = () => {
         <header className="bg-white/95 backdrop-blur-md border-b border-gray-200 p-4 md:hidden flex justify-between items-center sticky top-0 z-30 shadow-sm">
              <AppBrand />
              <div className="flex gap-2">
-                 <button onClick={() => refreshData(true)} className={`p-2 rounded-full text-gray-500 hover:bg-gray-100 ${isLoading ? 'animate-spin' : ''}`}><RefreshCw className="w-5 h-5"/></button>
+                 <button onClick={() => refreshData(true).catch(() => {})} className={`p-2 rounded-full text-gray-500 hover:bg-gray-100 ${isLoading ? 'animate-spin' : ''}`}><RefreshCw className="w-5 h-5"/></button>
                  <button onClick={handleLogout} className="p-2 text-red-500"><LogOut className="w-5 h-5"/></button>
              </div>
         </header>

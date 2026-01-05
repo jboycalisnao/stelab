@@ -1,8 +1,8 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIAnalysisResult } from "../types";
 
-// Always use process.env.API_KEY exclusively and directly for initialization
+// Always use process.env.API_KEY exclusively and directly for initialization as per guidelines
+// Initializing the GenAI client with direct environment variable access
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const SYSTEM_INSTRUCTION = `
@@ -14,11 +14,16 @@ Include typical storage locations or handling precautions.
 `;
 
 export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult> => {
+  if (!process.env.API_KEY) {
+    throw new Error("AI Enrichment is disabled: API Key missing.");
+  }
+
   const prompt = `Provide inventory details for the scientific equipment or apparatus named: "${itemName}". Return structured JSON only.`;
 
   try {
+    // Using gemini-3-pro-preview for STEM tasks and complex reasoning in cataloging
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview",
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -39,14 +44,10 @@ export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult
       }
     });
 
+    // Directly accessing the .text property from GenerateContentResponse
     if (response.text) {
-        let jsonStr = response.text.trim();
+        const jsonStr = response.text.trim();
         
-        // Sanitize: Remove markdown code blocks if present
-        if (jsonStr.startsWith('```')) {
-            jsonStr = jsonStr.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '');
-        }
-
         try {
             return JSON.parse(jsonStr) as AIAnalysisResult;
         } catch (parseError) {

@@ -1,12 +1,19 @@
-
 import * as storage from './storageService';
 import * as notifications from './notificationService';
+import { checkConnection } from '../supabaseClient';
 
 /**
  * SyncService handles automated maintenance tasks for the SciLab Inventory System.
  */
 
 export const performMaintenanceSync = async () => {
+    // Immediate exit if database is not reachable to avoid TypeError: Failed to fetch
+    const isConnected = await checkConnection();
+    if (!isConnected) {
+        console.warn("[SyncService] Maintenance sync aborted: Cloud connection is inactive.");
+        return { success: false, error: "Cloud connection inactive" };
+    }
+
     console.log("[SyncService] Starting maintenance sync...");
     try {
         const { updated } = await storage.syncOverdueStatus();
