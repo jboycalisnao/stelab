@@ -1,5 +1,4 @@
 
-
 export interface InventoryBox {
   id: string; // Unique Box ID (e.g. CHE-101-BOX-001)
   label: string; // Friendly label "Box 1"
@@ -58,6 +57,7 @@ export interface BorrowRecord {
   itemCategory: string;
   borrowerName: string;
   borrowerId: string;
+  borrowerEmail?: string; // New field to persist email for return notifications
   quantity: number;
   borrowDate: string;
   dueDate: string;
@@ -73,6 +73,7 @@ export interface AppSettings {
   adminUsername?: string;
   adminPassword?: string;
   recoveryEmail?: string;
+  labInCharge?: string; // New field for the signatory
   
   // Gmail Automation via Google Apps Script
   googleAppsScriptUrl?: string; // The Web App URL deployed from Google Script
@@ -126,10 +127,13 @@ export interface BorrowRequest {
   referenceCode: string;
   borrowerName: string;
   borrowerId: string;
-  borrowerEmail?: string; // New field for notifications
+  borrowerEmail?: string; 
+  instructorName?: string; // New field for supervisor tracking
   requestDate: string;
   returnDate: string;
   status: RequestStatus;
   items: RequestItem[];
   adminNotes?: string;
+  reservationSlot?: string; // Time slot
+  reservationDate?: string; // Date of reservation
 }

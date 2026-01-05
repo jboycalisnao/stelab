@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { FlaskConical, Lock, User, AlertCircle, Eye, EyeOff, Mail, ArrowRight, ArrowLeft, KeyRound, Loader2, Send, ShoppingBag, Search, QrCode, MapPin, Activity, Box, Tag } from 'lucide-react';
 import { AppSettings, BorrowRequest, InventoryItem } from '../types';
@@ -19,6 +20,11 @@ interface LoginProps {
   onPasswordReset?: (newPassword: string) => void;
 }
 
+const stripMetadata = (text: string) => {
+    if (!text) return '';
+    return text.replace(/<!--SYSTEM_META:.*?-->/g, '').trim();
+};
+
 const Login: React.FC<LoginProps> = ({ 
     appName, 
     logoUrl, 
@@ -31,26 +37,21 @@ const Login: React.FC<LoginProps> = ({
     onLogin,
     onPasswordReset
 }) => {
-  // Mode: 'landing' | 'admin' | 'reset' | 'item_view'
   const [viewMode, setViewMode] = useState<'landing' | 'admin' | 'reset' | 'item_view'>('landing');
 
-  // Login State
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Request State
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [trackCode, setTrackCode] = useState('');
   const [trackResult, setTrackResult] = useState<BorrowRequest | null | 'not_found'>(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
 
-  // Item View State
   const [publicItem, setPublicItem] = useState<InventoryItem | null>(null);
   const [isItemLoading, setIsItemLoading] = useState(false);
 
-  // Forgot Password State
   const [resetStep, setResetStep] = useState<1 | 2 | 3>(1);
   const [inputEmail, setInputEmail] = useState('');
   const [inputOtp, setInputOtp] = useState('');
@@ -61,7 +62,6 @@ const Login: React.FC<LoginProps> = ({
   const [resetSuccess, setResetSuccess] = useState('');
   const [isSendingOtp, setIsSendingOtp] = useState(false);
 
-  // Check URL for reference code or item ID on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
@@ -72,7 +72,6 @@ const Login: React.FC<LoginProps> = ({
         loadPublicItem(viewItem);
     } else if (ref) {
         setTrackCode(ref);
-        // Automatically trigger search
         handleTrackRequest(undefined, ref);
     }
   }, []);
@@ -111,24 +110,20 @@ const Login: React.FC<LoginProps> = ({
       setIsTrackLoading(false);
   };
 
-  // --- Reset Password Logic ---
   const sendOtpEmail = async (email: string, otp: string) => {
       if (!settings?.googleAppsScriptUrl) {
           throw new Error("Email service (Google Apps Script) not configured in Settings.");
       }
 
-      // Generate HTML Body
       const htmlBody = getPasswordResetTemplate({
           code: otp,
           appName: appName || 'SciLab Inventory System'
       });
       
-      // Fallback text
       const body = `Your Password Reset Code is: ${otp}\n\n` + 
                    `If you did not request this, please ignore this email.\n\n` +
                    `Sent from ${appName || 'SciLab Inventory System'}`;
 
-      // Use 'no-cors' to allow sending without preflight check errors
       await fetch(settings.googleAppsScriptUrl, {
           method: 'POST',
           mode: 'no-cors', 
@@ -200,8 +195,6 @@ const Login: React.FC<LoginProps> = ({
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center py-12 px-4 relative overflow-hidden">
-      
-      {/* Brand Header */}
       <div className="relative z-10 mb-8 text-center animate-in fade-in slide-in-from-top-4 duration-500">
         <div className="flex justify-center mb-4">
             {logoUrl ? (
@@ -216,12 +209,9 @@ const Login: React.FC<LoginProps> = ({
         <p className="text-gray-500 mt-2 font-medium">Laboratory Equipment Inventory System</p>
       </div>
 
-      {/* Main Card */}
       <div className="relative z-10 w-full max-w-4xl bg-white/90 backdrop-blur-xl border border-gray-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-[500px]">
-        
         {viewMode === 'landing' && (
             <div className="flex-1 flex flex-col animate-in fade-in zoom-in duration-300">
-                {/* Main Content: Student Portal */}
                 <div className="flex-1 p-8 md:p-12 flex flex-col justify-center items-center relative group">
                     <div className="absolute inset-0 bg-gradient-to-br from-maroon-50 to-transparent opacity-50"></div>
                     <div className="relative z-10 text-center space-y-8 w-full max-w-2xl">
@@ -242,7 +232,6 @@ const Login: React.FC<LoginProps> = ({
                             </button>
                         </div>
                         
-                        {/* Tracker Section */}
                         <div className="mt-10 pt-8 border-t border-gray-100 w-full max-w-md mx-auto">
                             <p className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-4">Already have a request?</p>
                             <form onSubmit={(e) => handleTrackRequest(e)} className="relative shadow-sm rounded-lg">
@@ -258,7 +247,6 @@ const Login: React.FC<LoginProps> = ({
                                 </button>
                             </form>
                             
-                            {/* Track Result */}
                             {trackResult && (
                                 <div className="mt-4 animate-in fade-in slide-in-from-top-2">
                                     {trackResult === 'not_found' ? (
@@ -282,7 +270,6 @@ const Login: React.FC<LoginProps> = ({
                     </div>
                 </div>
 
-                {/* Footer: Admin Access */}
                 <div className="py-4 border-t border-gray-100 bg-gray-50/50 flex justify-center">
                     <button 
                         onClick={() => setViewMode('admin')}
@@ -308,7 +295,6 @@ const Login: React.FC<LoginProps> = ({
                         </div>
                     ) : publicItem ? (
                         <div className="space-y-8">
-                            {/* Header */}
                             <div className="flex items-start justify-between">
                                 <div>
                                     <h2 className="text-3xl font-extrabold text-gray-800 mb-2">{publicItem.name}</h2>
@@ -330,14 +316,12 @@ const Login: React.FC<LoginProps> = ({
                                 </div>
                             </div>
 
-                            {/* Availability Card */}
                             <div className="bg-gradient-to-r from-maroon-50 to-white border border-maroon-100 rounded-2xl p-6 shadow-sm">
                                 <div className="flex items-center gap-3 mb-2">
                                     <Box className="w-5 h-5 text-maroon-600" />
                                     <h3 className="text-lg font-bold text-gray-800">Availability Status</h3>
                                 </div>
                                 {(() => {
-                                    // Use Borrow Limit if defined, otherwise total quantity
                                     const limit = publicItem.maxBorrowable ?? publicItem.quantity;
                                     const available = Math.max(0, limit - (publicItem.borrowedQuantity || 0));
                                     const percentage = (available / limit) * 100;
@@ -369,7 +353,6 @@ const Login: React.FC<LoginProps> = ({
                                 })()}
                             </div>
 
-                            {/* Details Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="bg-gray-50 p-5 rounded-xl border border-gray-100">
                                     <div className="flex items-center gap-2 mb-3 text-gray-700 font-bold">
@@ -385,17 +368,15 @@ const Login: React.FC<LoginProps> = ({
                                 </div>
                             </div>
 
-                            {/* Description */}
                             {publicItem.description && (
                                 <div>
                                     <h4 className="font-bold text-gray-800 mb-2">Description</h4>
                                     <p className="text-gray-600 leading-relaxed bg-white p-4 border border-gray-100 rounded-xl">
-                                        {publicItem.description}
+                                        {stripMetadata(publicItem.description)}
                                     </p>
                                 </div>
                             )}
 
-                             {/* Safety Notes */}
                              {publicItem.safetyNotes && (
                                 <div className="bg-orange-50 p-5 rounded-xl border border-orange-100">
                                     <h4 className="font-bold text-orange-800 mb-2 flex items-center gap-2">
@@ -503,7 +484,6 @@ const Login: React.FC<LoginProps> = ({
 
                     <h3 className="text-2xl font-bold text-gray-800 text-center mb-2">Recovery</h3>
                     
-                    {/* Reset steps logic embedded here for brevity, reuse state from previous implementation */}
                     {resetStep === 1 && (
                         <form onSubmit={handleResetStep1} className="space-y-6 mt-6">
                             <p className="text-center text-gray-500 text-sm">Enter your recovery email to receive a code.</p>

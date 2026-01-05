@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { InventoryItem, ItemCondition, Category } from '../types';
 import { Edit2, Trash2, QrCode, Search, Filter, HandPlatter, Barcode, FileText, List, Printer, AlertTriangle, XCircle, Clipboard, ChevronDown, ChevronRight, Package, LayoutGrid, Droplets, Minus } from 'lucide-react';
@@ -14,6 +15,11 @@ interface InventoryListProps {
   onConsume?: (item: InventoryItem) => void;
   initialSearchTerm?: string;
 }
+
+const stripMetadata = (text: string) => {
+    if (!text) return '';
+    return text.replace(/<!--SYSTEM_META:.*?-->/g, '').trim();
+};
 
 const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit, onDelete, onShowQR, onBorrow, onPrintBarcodes, onConsume, initialSearchTerm }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'report'>('list');
@@ -44,8 +50,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
   const groupedItems = useMemo(() => {
       const groups: Record<string, InventoryItem[]> = {};
       
-      // Initialize with empty arrays for known categories (optional, if we want to show empty sections, but usually we hide them)
-      // Here we only group what exists in filteredItems
       filteredItems.forEach(item => {
           if (!groups[item.category]) groups[item.category] = [];
           groups[item.category].push(item);
@@ -55,7 +59,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
 
   // Auto-expand categories when search changes
   useEffect(() => {
-      // If the user searches, we generally want to see the results, so we expand all groups that have matches.
       if (searchTerm.trim().length > 0) {
           const visibleCategories = Object.keys(groupedItems);
           setExpandedCategories(new Set(visibleCategories));
@@ -88,7 +91,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
           };
       }).filter(c => c.count > 0);
 
-      // Add "Other" if any
       const knownCats = new Set(categories.map(c => c.name));
       const otherItems = items.filter(i => !knownCats.has(i.category));
       if (otherItems.length > 0) {
@@ -177,7 +179,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
   };
 
   const handlePrintWorksheet = () => {
-    // ... (Keep existing worksheet code logic)
     const printWindow = window.open('', '', 'height=800,width=900');
     if (printWindow) {
         printWindow.document.write('<html><head><title>Inventory Encoding Worksheet</title>');
@@ -228,10 +229,8 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
     }
   };
 
-  // Sort categories to match the order in settings, plus any extras
   const sortedCategoryKeys = useMemo(() => {
       const activeKeys = Object.keys(groupedItems);
-      // Create a map for order
       const orderMap = new Map<string, number>(categories.map((c, i) => [c.name, i]));
       
       return activeKeys.sort((a, b) => {
@@ -243,7 +242,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
 
   return (
     <div className="bg-white rounded-xl shadow-xl border border-gray-200 flex flex-col h-[calc(100vh-200px)]">
-      {/* Header Tabs */}
       <div className="flex border-b border-gray-200 bg-gray-50/50 rounded-t-xl px-4 pt-4 gap-1 flex-shrink-0">
           <button
             onClick={() => setActiveTab('list')}
@@ -271,7 +269,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
 
       {activeTab === 'list' && (
         <>
-            {/* List Toolbar */}
             <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row gap-4 justify-between items-center bg-white flex-shrink-0">
                 <div className="relative w-full sm:w-96">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
@@ -308,7 +305,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                 </div>
             </div>
 
-            {/* List Content */}
             <div className="flex-1 overflow-auto bg-gray-50 p-4 space-y-4">
                 {filteredItems.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 text-gray-400">
@@ -326,7 +322,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
 
                         return (
                             <div key={catName} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300">
-                                {/* Category Header */}
                                 <div 
                                     onClick={() => toggleCategory(catName)}
                                     className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 select-none group"
@@ -352,7 +347,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                                     </div>
                                 </div>
 
-                                {/* Collapsible Table Content */}
                                 {isExpanded && (
                                     <div className="border-t border-gray-100 animate-in slide-in-from-top-1 duration-200">
                                         <div className="overflow-x-auto">
@@ -369,10 +363,10 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                                                 <tbody className="divide-y divide-gray-100">
                                                     {catItems.map((item) => {
                                                         const hasLimit = item.maxBorrowable !== undefined && item.maxBorrowable !== null;
-                                                        // Explicitly cast to prevent arithmetic errors
                                                         const borrowLimit = hasLimit ? Number(item.maxBorrowable!) : Number(item.quantity);
                                                         const available = Math.max(0, borrowLimit - Number(item.borrowedQuantity || 0));
                                                         const isRestricted = hasLimit && borrowLimit < Number(item.quantity);
+                                                        const sanitizedDescription = stripMetadata(item.description);
 
                                                         return (
                                                             <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
@@ -386,7 +380,7 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                                                                         )}
                                                                     </div>
                                                                     {item.shortId && <div className="text-[10px] text-gray-400 font-mono mt-0.5">{item.shortId}</div>}
-                                                                    {item.description && <div className="text-xs text-gray-500 truncate max-w-[180px]">{item.description}</div>}
+                                                                    {sanitizedDescription && <div className="text-xs text-gray-500 truncate max-w-[180px]">{sanitizedDescription}</div>}
                                                                 </td>
                                                                 <td className="px-6 py-3">
                                                                     <div className="flex flex-col">
@@ -409,7 +403,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                                                                 </td>
                                                                 <td className="px-6 py-3 text-right">
                                                                     <div className="flex justify-end space-x-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                                                                        {/* Consumable Quick Action */}
                                                                         {item.isConsumable && onConsume && (
                                                                             <button
                                                                                 onClick={() => onConsume(item)}
@@ -480,7 +473,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
 
       {activeTab === 'report' && (
           <div className="flex-1 overflow-auto p-6 space-y-8 animate-in fade-in duration-300 bg-gray-50">
-              {/* Report Header */}
               <div className="flex justify-between items-start">
                   <div>
                       <h3 className="text-2xl font-bold text-gray-800">Inventory Summary</h3>
@@ -495,7 +487,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                   </button>
               </div>
 
-              {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm text-center">
                       <div className="text-3xl font-bold text-gray-900">{reportData.totalItems}</div>
@@ -511,7 +502,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                   </div>
               </div>
 
-              {/* Category Table */}
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                   <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                       <h4 className="font-bold text-gray-800">Breakdown by Category</h4>
@@ -538,9 +528,7 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                   </table>
               </div>
 
-              {/* Alerts Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Low Stock */}
                   <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                        <div className="px-6 py-4 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
                           <AlertTriangle className="w-5 h-5 text-amber-600" />
@@ -568,7 +556,6 @@ const InventoryList: React.FC<InventoryListProps> = ({ items, categories, onEdit
                       </div>
                   </div>
 
-                  {/* Unavailable / Defective */}
                   <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                       <div className="px-6 py-4 bg-red-50 border-b border-red-100 flex items-center gap-2">
                           <XCircle className="w-5 h-5 text-red-600" />

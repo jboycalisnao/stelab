@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { InventoryItem, ItemCondition, Category, InventoryBox } from '../types';
-import { X, Box, Lock, Plus, PackageOpen, Trash2 } from 'lucide-react';
+import { X, Box, Lock, Plus, PackageOpen, Trash2, Sparkles, Loader2 } from 'lucide-react';
+import { enrichTextData } from '../services/geminiService';
 
 interface InventoryFormProps {
   initialData?: InventoryItem;
@@ -11,6 +12,7 @@ interface InventoryFormProps {
 }
 
 const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, onSubmit, onCancel }) => {
+  const [isEnriching, setIsEnriching] = useState(false);
   const [formData, setFormData] = useState<Partial<InventoryItem>>(
     initialData || {
       name: '',
@@ -29,11 +31,9 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
     }
   );
 
-  // Check if maxBorrowable has a valid value (including 0)
   const hasLimit = initialData?.maxBorrowable !== undefined && initialData?.maxBorrowable !== null;
   const [useBorrowLimit, setUseBorrowLimit] = useState<boolean>(hasLimit);
 
-  // Boxed Item State
   const hasBoxes = initialData?.boxes && initialData.boxes.length > 0;
   const [enableBoxTracking, setEnableBoxTracking] = useState<boolean>(!!hasBoxes);
   const [newBoxCount, setNewBoxCount] = useState(1);
@@ -49,6 +49,28 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
     }
   };
 
+  const handleSmartEnrich = async () => {
+    if (!formData.name?.trim()) {
+        alert("Please enter an item name first to use AI Enrichment.");
+        return;
+    }
+    setIsEnriching(true);
+    try {
+        const result = await enrichTextData(formData.name);
+        setFormData(prev => ({
+            ...prev,
+            category: result.category || prev.category,
+            description: result.description || prev.description,
+            safetyNotes: result.safetyNotes || prev.safetyNotes
+        }));
+    } catch (err) {
+        console.error("Enrichment failed", err);
+        alert("AI enrichment failed. Please check your API key or try again later.");
+    } finally {
+        setIsEnriching(false);
+    }
+  };
+
   const handleLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = parseInt(e.target.value);
       setFormData(prev => ({ ...prev, maxBorrowable: isNaN(val) ? undefined : val }));
@@ -56,7 +78,6 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
 
   const handleAddBoxes = () => {
       const currentShortId = formData.shortId || formData.category?.substring(0, 3).toUpperCase() + '-' + Math.floor(1000 + Math.random() * 9000);
-      
       const newBoxesList: InventoryBox[] = [];
       const currentBoxCount = boxes.length;
 
@@ -69,11 +90,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
           });
       }
 
-      // Add to boxes list
-      const updatedBoxes = [...boxes, ...newBoxesList];
-      setBoxes(updatedBoxes);
-
-      // Update Total Quantity automatically
+      setBoxes(prev => [...prev, ...newBoxesList]);
       const addedQuantity = newBoxCount * qtyPerBox;
       setFormData(prev => ({
           ...prev,
@@ -83,7 +100,6 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
 
   const handleRemoveBox = (boxId: string, boxQty: number) => {
       setBoxes(prev => prev.filter(b => b.id !== boxId));
-      // Deduct from total quantity
       setFormData(prev => ({
           ...prev,
           quantity: Math.max(0, (prev.quantity || 0) - boxQty)
@@ -97,12 +113,9 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
         return;
     }
     
-    // Logic check: Max borrowable shouldn't exceed total quantity
-    // If box tracking is disabled, we send an empty boxes array
     const finalData = { ...formData, boxes: enableBoxTracking ? boxes : [] };
     
     if (!useBorrowLimit) {
-        // Explicitly set to null to indicate clearing the limit in the DB
         finalData.maxBorrowable = null;
     } else if (finalData.maxBorrowable !== undefined && finalData.maxBorrowable !== null && finalData.quantity !== undefined) {
         if (finalData.maxBorrowable > finalData.quantity) {
@@ -128,21 +141,31 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="space-y-4">
-            {/* Name Row */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Item Name *</label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400 shadow-sm bg-white"
-                placeholder="e.g. Bunsen Burner"
-                required
-              />
+              <div className="flex gap-2">
+                <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400 shadow-sm bg-white"
+                    placeholder="e.g. Bunsen Burner"
+                    required
+                />
+                <button 
+                    type="button"
+                    onClick={handleSmartEnrich}
+                    disabled={isEnriching}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-200 hover:bg-indigo-100 transition-colors font-bold disabled:opacity-50 text-sm whitespace-nowrap"
+                    title="Use Gemini AI to categorize and fill details"
+                >
+                    {isEnriching ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4" />}
+                    Smart Enrich
+                </button>
+              </div>
             </div>
 
-            {/* Grid for details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
@@ -201,7 +224,6 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
               </div>
             </div>
             
-            {/* Boxed Items Management Toggle */}
             <div className="flex items-center space-x-3 bg-indigo-50 p-3 rounded-lg border border-indigo-100 transition-all">
                 <input
                     type="checkbox"
@@ -216,17 +238,16 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                 </label>
             </div>
 
-            {/* Boxed Items Management Panel */}
             {enableBoxTracking && (
                 <div className="bg-white p-4 rounded-lg border border-indigo-100 shadow-sm ml-4 border-l-4 border-l-indigo-400 animate-in slide-in-from-top-2">
                     <div className="flex items-center gap-2 mb-3">
                         <PackageOpen className="w-5 h-5 text-indigo-600" />
-                        <h3 className="font-bold text-gray-800">Boxed Stock Details</h3>
+                        <h3 className="font-bold text-gray-800 text-sm">Boxed Stock Details</h3>
                     </div>
                     
                     <div className="grid grid-cols-3 gap-3 mb-3">
                         <div>
-                            <label className="text-xs font-medium text-gray-600 block mb-1">Number of Boxes</label>
+                            <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Number of Boxes</label>
                             <input 
                                 type="number" 
                                 min="1"
@@ -236,7 +257,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                             />
                         </div>
                         <div>
-                            <label className="text-xs font-medium text-gray-600 block mb-1">Qty per Box</label>
+                            <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Qty per Box</label>
                             <input 
                                 type="number" 
                                 min="1"
@@ -249,9 +270,9 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                             <button 
                                 type="button" 
                                 onClick={handleAddBoxes}
-                                className="w-full px-3 py-1.5 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 flex items-center justify-center gap-1"
+                                className="w-full px-3 py-1.5 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 flex items-center justify-center gap-1 font-bold shadow-sm"
                             >
-                                <Plus className="w-4 h-4" /> Generate Boxes
+                                <Plus className="w-4 h-4" /> Add Boxes
                             </button>
                         </div>
                     </div>
@@ -259,7 +280,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                     {boxes.length > 0 ? (
                         <div className="mt-4 bg-white rounded-lg border border-gray-200 max-h-40 overflow-y-auto p-2">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-gray-50 text-xs text-gray-500">
+                                <thead className="bg-gray-50 text-[10px] uppercase text-gray-500 font-bold">
                                     <tr>
                                         <th className="px-2 py-1">Label</th>
                                         <th className="px-2 py-1">Qty</th>
@@ -273,7 +294,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                                             <td className="px-2 py-1.5 font-medium">{box.label}</td>
                                             <td className="px-2 py-1.5">{box.quantity}</td>
                                             <td className="px-2 py-1.5">
-                                                <span className={`text-xs px-1.5 py-0.5 rounded ${box.status === 'Sealed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${box.status === 'Sealed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                                                     {box.status}
                                                 </span>
                                             </td>
@@ -297,7 +318,6 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                 </div>
             )}
 
-            {/* Borrow Limit Section */}
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                 <div className="flex items-center space-x-3 mb-2">
                     <input
@@ -309,14 +329,14 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                     />
                     <label htmlFor="useBorrowLimit" className="text-sm font-bold text-gray-800 cursor-pointer select-none flex items-center gap-2">
                         <Lock className="w-4 h-4 text-blue-600" />
-                        Set Borrowing Limit (Boxed Stock)
+                        Set Borrowing Limit
                     </label>
                 </div>
                 
                 {useBorrowLimit && (
                     <div className="animate-in fade-in slide-in-from-top-2 duration-200 ml-7">
                         <p className="text-xs text-gray-600 mb-2">
-                            Specify the quantity available for daily lending. Use this if you have sealed boxes you don't want opened.
+                            Specify max quantity available for loan. Keep sealed boxes safe.
                         </p>
                         <div className="flex items-center gap-3">
                             <input
@@ -326,18 +346,16 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                                 max={formData.quantity}
                                 value={formData.maxBorrowable ?? ''}
                                 onChange={handleLimitChange}
-                                placeholder={formData.quantity?.toString()}
                                 className="w-32 px-3 py-1.5 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                             />
                             <span className="text-sm text-gray-500">
-                                out of {formData.quantity} {formData.unit} available for loan
+                                units available for loan
                             </span>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Consumable Toggle */}
             <div className="flex items-center space-x-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <input
                     type="checkbox"
@@ -348,22 +366,9 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                     className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                 />
                 <label htmlFor="isConsumable" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
-                    Is this item a Consumable? <span className="text-gray-500 font-normal">(e.g., test tubes, pipettes, chemicals)</span>
+                    Is this item a Consumable? <span className="text-gray-500 font-normal">(e.g., chemicals, test tubes)</span>
                 </label>
             </div>
-
-            {/* Short ID Display (Read Only) */}
-            {initialData?.shortId && (
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Short ID (System Generated)</label>
-                    <input
-                        type="text"
-                        value={initialData.shortId}
-                        readOnly
-                        className="w-full px-4 py-2 border border-gray-200 bg-gray-100 rounded-lg text-gray-600 font-mono text-sm shadow-sm cursor-not-allowed"
-                    />
-                </div>
-            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Location *</label>
@@ -373,7 +378,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
                 value={formData.location}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 shadow-sm bg-white"
-                placeholder="e.g. Chemistry Lab, Cabinet A"
+                placeholder="e.g. Cabinet A, Physics Lab"
                 required
               />
             </div>
@@ -407,13 +412,13 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
             <button
               type="button"
               onClick={onCancel}
-              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md"
+              className="px-8 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-bold shadow-md"
             >
               Save Equipment
             </button>

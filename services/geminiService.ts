@@ -7,17 +7,17 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const SYSTEM_INSTRUCTION = `
 You are an expert Laboratory Manager and Science Educator for High School laboratories. 
-Your goal is to assist in cataloging equipment accurately.
-Ensure descriptions are educational yet concise, and safety notes are practical.
-Classify items into standard scientific categories (e.g., Chemistry, Biology, Physics, Earth Science) or General.
+Your goal is to assist in cataloging scientific equipment accurately.
+Ensure descriptions are educational yet concise, and safety notes are practical for a school environment.
+Classify items into standard high school scientific domains: 'Chemistry', 'Biology', 'Physics', 'Earth Science', or 'General'.
+Include typical storage locations or handling precautions.
 `;
 
 export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult> => {
-  const prompt = `Provide inventory details for the scientific equipment named: "${itemName}".`;
+  const prompt = `Provide inventory details for the scientific equipment or apparatus named: "${itemName}". Return structured JSON only.`;
 
   try {
     const response = await ai.models.generateContent({
-      // Using gemini-3-flash-preview for basic cataloging task
       model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
@@ -27,7 +27,10 @@ export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult
           type: Type.OBJECT,
           properties: {
             name: { type: Type.STRING },
-            category: { type: Type.STRING },
+            category: { 
+              type: Type.STRING,
+              description: "Must be one of: Chemistry, Biology, Physics, Earth Science, or General"
+            },
             description: { type: Type.STRING },
             safetyNotes: { type: Type.STRING }
           },
@@ -39,7 +42,7 @@ export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult
     if (response.text) {
         let jsonStr = response.text.trim();
         
-        // Sanitize: Remove markdown code blocks if present (e.g., ```json ... ```)
+        // Sanitize: Remove markdown code blocks if present
         if (jsonStr.startsWith('```')) {
             jsonStr = jsonStr.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '');
         }

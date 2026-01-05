@@ -21,7 +21,8 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const isOverdue = (dueDate: string) => {
-    return new Date(dueDate) < new Date() && new Date().toISOString().split('T')[0] !== dueDate;
+    const today = new Date().toISOString().split('T')[0];
+    return dueDate < today;
   };
 
   // Create Lookup Map for Request Reference Codes AND Request IDs
@@ -49,12 +50,14 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
             record.itemName.toLowerCase().includes(searchTerm.toLowerCase()) || 
             record.borrowerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             refCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            reqId.toLowerCase().includes(searchTerm.toLowerCase()); // Search by Request ID (UUID)
+            reqId.toLowerCase().includes(searchTerm.toLowerCase()); 
         
-        const isOverdueItem = isOverdue(record.dueDate) && record.status === 'Borrowed';
+        // FIX: Include both items that are already marked 'Overdue' in DB 
+        // AND items marked 'Borrowed' that have passed their due date.
+        const isOverdueItem = record.status === 'Overdue' || (record.status === 'Borrowed' && isOverdue(record.dueDate));
 
         const matchesStatus = filterStatus === 'All' || 
-            (filterStatus === 'Borrowed' && record.status === 'Borrowed') ||
+            (filterStatus === 'Borrowed' && record.status === 'Borrowed' && !isOverdue(record.dueDate)) ||
             (filterStatus === 'Returned' && record.status === 'Returned') ||
             (filterStatus === 'Overdue' && isOverdueItem);
 
@@ -93,6 +96,7 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
       return Object.keys(source).sort((a, b) => {
           const latestA = source[a][0]?.borrowDate || '';
           const latestB = source[b][0]?.borrowDate || '';
+          // Fixed syntax error: removed stray parenthesis at the end of the return expression.
           return new Date(latestB).getTime() - new Date(latestA).getTime();
       });
   }, [groupedByItem, groupedByRequest, viewMode]);
@@ -128,9 +132,9 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
 
   // Helper to calculate summary for a group of records
   const getGroupStats = (recs: BorrowRecord[]) => {
-      const active = recs.filter(r => r.status === 'Borrowed').length;
+      const active = recs.filter(r => r.status === 'Borrowed' && !isOverdue(r.dueDate)).length;
       const returned = recs.filter(r => r.status === 'Returned').length;
-      const overdue = recs.filter(r => r.status === 'Borrowed' && isOverdue(r.dueDate)).length;
+      const overdue = recs.filter(r => r.status === 'Overdue' || (r.status === 'Borrowed' && isOverdue(r.dueDate))).length;
       return { active, returned, overdue };
   };
 
@@ -306,7 +310,7 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
                                 <tbody className="divide-y divide-gray-100">
                                     {recs.map(record => {
                                         const reqData = recordRequestMap.get(record.id);
-                                        const overdueItem = isOverdue(record.dueDate) && record.status === 'Borrowed';
+                                        const overdueItem = record.status === 'Overdue' || (record.status === 'Borrowed' && isOverdue(record.dueDate));
                                         
                                         return (
                                         <tr key={record.id} className={`hover:bg-white transition-colors ${selectedIds.has(record.id) ? 'bg-indigo-50/40' : (overdueItem ? 'bg-red-50/50' : '')}`}>
@@ -369,7 +373,7 @@ const LendingList: React.FC<LendingListProps> = ({ records, requests, onReturn, 
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    {record.status === 'Borrowed' && (
+                                                    {(record.status === 'Borrowed' || record.status === 'Overdue') && (
                                                         <button 
                                                             onClick={(e) => { e.stopPropagation(); onReturn(record.id); }}
                                                             className="inline-flex items-center space-x-1 px-2 py-1 bg-green-50 text-green-700 hover:bg-green-100 rounded text-xs font-medium transition-colors border border-green-200"

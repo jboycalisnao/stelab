@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
 import * as sync from './services/syncService';
-import { supabase } from './supabaseClient';
+import { supabase, checkConnection } from './supabaseClient';
 import Dashboard from './components/Dashboard';
 import InventoryList from './components/InventoryList';
 import LendingList from './components/LendingList';
@@ -17,15 +17,16 @@ import Login from './components/Login';
 import Scanner from './components/Scanner';
 import RequestsList from './components/RequestsList';
 import ConfirmModal from './components/ConfirmModal';
-import { LayoutDashboard, List, Plus, FlaskConical, HandPlatter, Settings as SettingsIcon, LogOut, ScanLine, Loader2, Inbox, RefreshCw } from 'lucide-react';
+import { getUserStatusUpdateTemplate } from './services/emailTemplates';
+import { LayoutDashboard, List, Plus, FlaskConical, HandPlatter, Settings as SettingsIcon, LogOut, ScanLine, Inbox, RefreshCw, Cloud, AlertCircle } from 'lucide-react';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDbConnected, setIsDbConnected] = useState<boolean | null>(null);
   
-  // Loading UX State
   const [isFirstLoad, setIsFirstLoad] = useState(true);
-  const [loadingStatus, setLoadingStatus] = useState("Initializing system...");
+  const [loadingStatus, setLoadingStatus] = useState("Establishing Cloud Link...");
   const [lastSynced, setLastSynced] = useState<Date>(new Date());
 
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -35,47 +36,37 @@ const App: React.FC = () => {
   const [requests, setRequests] = useState<BorrowRequest[]>([]);
   
   const [view, setView] = useState<'dashboard' | 'inventory' | 'lending' | 'scanner' | 'settings' | 'requests'>('dashboard');
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | undefined>(undefined);
   const [qrItem, setQrItem] = useState<InventoryItem | undefined>(undefined);
   const [barcodeItem, setBarcodeItem] = useState<InventoryItem | undefined>(undefined);
-  
-  // Borrow Modal State
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [preSelectedBorrowItem, setPreSelectedBorrowItem] = useState<InventoryItem | undefined>(undefined);
   const [borrowSpecificId, setBorrowSpecificId] = useState<string | undefined>(undefined);
-
-  // Return Modal State
   const [returnModalState, setReturnModalState] = useState<{ isOpen: boolean; record?: BorrowRecord; item?: InventoryItem }>({ isOpen: false });
 
-  // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-    isDestructive: boolean;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {},
-    isDestructive: false
-  });
+    isOpen: boolean; title: string; message: string; onConfirm: () => void; isDestructive: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, isDestructive: false });
 
-  // Deep Link State
-  const [initialSearchTerm, setInitialSearchTerm] = useState('');
-
-  const refreshData = React.useCallback(async (silent = false) => {
+  const refreshData = useCallback(async (silent = false) => {
       if (!silent) setIsLoading(true);
       try {
-          if (!silent) setLoadingStatus("Loading configuration...");
-          const loadedSettings = await storage.getSettings();
-          if (!silent) setSettings(loadedSettings);
+          if (!silent) setLoadingStatus("Checking Cloud Integrity...");
+          const connected = await checkConnection();
+          setIsDbConnected(connected);
 
-          if (!silent) setLoadingStatus("Syncing inventory database...");
+          if (!connected) {
+              if (!silent) setLoadingStatus("Database Connection Failure");
+              throw new Error("Cloud inaccessible");
+          }
+
+          if (!silent) setLoadingStatus("Pulling Live Configuration...");
+          const loadedSettings = await storage.getSettings();
+          setSettings(loadedSettings);
+
+          if (!silent) setLoadingStatus("Synchronizing State...");
           const [loadedItems, loadedRecords, loadedCats, loadedRequests] = await Promise.all([
               storage.getInventory(),
               storage.getBorrowRecords(),
@@ -90,9 +81,9 @@ const App: React.FC = () => {
           setLastSynced(new Date());
           
           if (!silent) setLoadingStatus("Ready");
-      } catch (e) {
-          console.error("Data Load Error", e);
-          if (!silent) setLoadingStatus("Connection error. Retrying...");
+      } catch (e: any) {
+          console.error("Critical Cloud Failure", e);
+          setIsDbConnected(false);
       } finally {
           if (!silent) setIsLoading(false);
       }
@@ -100,20 +91,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const auth = localStorage.getItem('scilab_auth');
-    if (auth === 'true') {
-        setIsAuthenticated(true);
-    }
+    if (auth === 'true') setIsAuthenticated(true);
     
-    // Initial Load Sequence
     refreshData(false).then(() => {
-        // Run maintenance sync on startup to catch up on time passed while "not in use"
         sync.performMaintenanceSync();
-        setTimeout(() => {
-            setIsFirstLoad(false);
-        }, 1200);
+        setTimeout(() => setIsFirstLoad(false), 800);
     });
 
-    // Real-time Subscriptions
     const channels = [
         supabase.channel('public:inventory_items').on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, () => refreshData(true)).subscribe(),
         supabase.channel('public:borrow_records').on('postgres_changes', { event: '*', schema: 'public', table: 'borrow_records' }, () => refreshData(true)).subscribe(),
@@ -122,12 +106,10 @@ const App: React.FC = () => {
         supabase.channel('public:borrow_requests').on('postgres_changes', { event: '*', schema: 'public', table: 'borrow_requests' }, () => refreshData(true)).subscribe(),
     ];
 
-    // Setup Hourly Auto-Refresh (3600000ms = 1 hour)
-    // This ensures data is refreshed even if no real-time changes were pushed.
     const cleanupRefresh = sync.setupAutoRefresh(() => {
         refreshData(true);
         sync.performMaintenanceSync();
-    }, 3600000);
+    }, 300000); // 5 min auto-refresh
 
     return () => {
         channels.forEach(ch => supabase.removeChannel(ch));
@@ -135,59 +117,67 @@ const App: React.FC = () => {
     };
   }, [refreshData]);
 
-  // Handle Deep Links (View Item)
-  useEffect(() => {
-    if (isAuthenticated) {
-        const params = new URLSearchParams(window.location.search);
-        const viewItem = params.get('view_item');
-        if (viewItem) {
-            setInitialSearchTerm(viewItem);
-            setView('inventory');
-            window.history.replaceState({}, '', window.location.pathname);
-        }
-    }
-  }, [isAuthenticated]);
+  const sendStatusUpdateEmail = async (borrowerEmail: string, borrowerName: string, status: 'Approved' | 'Released' | 'Rejected' | 'Returned', items: {name: string, qty: number}[], returnDate: string) => {
+      if (!borrowerEmail || !settings?.googleAppsScriptUrl) return;
 
-  useEffect(() => {
-    const handleResize = () => {
-        const mobile = window.innerWidth < 768;
-        setIsMobile(mobile);
-        if (mobile && view === 'dashboard') {
-            setView('scanner');
-        }
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [view]);
+      try {
+          const htmlBody = getUserStatusUpdateTemplate({
+              borrowerName,
+              referenceCode: "Active Record",
+              status,
+              returnDate,
+              appName: settings.appName,
+              items
+          });
 
-  useEffect(() => {
-    if (!settings) return;
-    document.title = settings.appName;
-    const updateFavicon = (url: string) => {
-      let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'icon';
-        document.head.appendChild(link);
+          const payload = {
+              to_email: borrowerEmail,
+              subject: `Update: Laboratory Equipment ${status}`,
+              body: `Hello ${borrowerName}, your borrowed equipment status is now: ${status}.`,
+              html_body: htmlBody,
+              app_name: settings.appName
+          };
+
+          await fetch(settings.googleAppsScriptUrl, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'text/plain' },
+              body: JSON.stringify(payload)
+          });
+      } catch (e) {
+          console.error("Failed to send status email", e);
       }
-      link.href = url;
-    };
-    if (settings.logoUrl) {
-      updateFavicon(settings.logoUrl);
-    } else {
-      const defaultFavicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2'/%3E%3Cpath d='M8.5 2h7'/%3E%3Cpath d='M7 16h10'/%3E%3C/svg%3E";
-      updateFavicon(defaultFavicon);
-    }
-  }, [settings]);
+  };
+
+  const AppBrand = () => (
+      <div className="flex flex-col gap-4">
+          <div className="flex items-center space-x-3">
+              {settings?.logoUrl ? (
+                  <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-lg bg-white p-0.5 border border-gray-200" />
+              ) : (
+                  <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
+                     <FlaskConical className="w-6 h-6" />
+                  </div>
+              )}
+              <h1 className="text-xl font-bold text-gray-800 tracking-tight leading-tight">{settings?.appName || 'SciLab Pro'}</h1>
+          </div>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${isDbConnected ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+              {isDbConnected ? <Cloud className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+              {isDbConnected ? 'Cloud Active' : 'Disconnected'}
+          </div>
+      </div>
+  );
+
+  const openBorrowModal = (item?: InventoryItem, sId?: string) => {
+      setPreSelectedBorrowItem(item);
+      setBorrowSpecificId(sId);
+      setIsBorrowModalOpen(true);
+  };
 
   const handleLogin = (status: boolean) => {
       if (status) {
           localStorage.setItem('scilab_auth', 'true');
           setIsAuthenticated(true);
-          if (window.innerWidth < 768) {
-              setView('scanner');
-          }
       }
   };
 
@@ -198,16 +188,7 @@ const App: React.FC = () => {
   };
 
   const confirmAction = (title: string, message: string, action: () => void, isDestructive = false) => {
-    setConfirmModal({
-        isOpen: true,
-        title,
-        message,
-        onConfirm: () => {
-            action();
-            setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        },
-        isDestructive
-    });
+    setConfirmModal({ isOpen: true, title, message, onConfirm: () => { action(); setConfirmModal(prev => ({ ...prev, isOpen: false })); }, isDestructive });
   };
 
   const handleSave = async (item: InventoryItem) => {
@@ -217,38 +198,50 @@ const App: React.FC = () => {
         setIsFormOpen(false);
         setEditingItem(undefined);
     } else {
-        alert("Error saving item: " + (result.message || "Unknown error"));
+        alert("Cloud Save Failed: " + (result.message || "Network Error"));
     }
   };
 
   const handleDelete = async (id: string) => {
-    confirmAction(
-        "Delete Equipment", 
-        "Are you sure you want to permanently delete this item from inventory? This action cannot be undone.", 
+    confirmAction("Delete Equipment", "Permanently remove this item from the cloud? This action is absolute.", async () => {
+        await storage.deleteItem(id);
+        await refreshData(true);
+    }, true);
+  };
+
+  const handleDeleteRecord = async (id: string) => {
+      confirmAction(
+        "Delete Loan Record",
+        "Permanently remove this borrowing record? This will NOT restore inventory. Use Return if the item was physically returned.",
         async () => {
-            await storage.deleteItem(id);
+            await storage.deleteBorrowRecord(id);
             await refreshData(true);
         },
         true
-    );
+      );
   };
 
-  const handleBorrowConfirm = async (
-      item: InventoryItem, 
-      borrowerName: string, 
-      borrowerId: string, 
-      quantity: number, 
-      dueDate: string, 
-      specificId?: string
-  ) => {
-    const result = await storage.borrowItem(item.id, borrowerName, borrowerId, quantity, dueDate, specificId);
+  const handleDeleteRecordsBulk = async (ids: string[]) => {
+      confirmAction(
+        "Delete Bulk Records",
+        `Permanently delete ${ids.length} selected borrowing records?`,
+        async () => {
+            for (const id of ids) {
+                await storage.deleteBorrowRecord(id);
+            }
+            await refreshData(true);
+        },
+        true
+      );
+  };
+
+  const handleBorrowConfirm = async (item: InventoryItem, bName: string, bId: string, qty: number, dDate: string, borrowerEmail?: string, sId?: string) => {
+    const result = await storage.borrowItem(item.id, bName, bId, qty, dDate, borrowerEmail, sId);
     if (result.success) {
         await refreshData(true);
         setIsBorrowModalOpen(false);
-        setPreSelectedBorrowItem(undefined);
-        setBorrowSpecificId(undefined);
     } else {
-        alert(result.message || "Failed to borrow item.");
+        alert(result.message || "Failed to commit loan to cloud.");
     }
   };
 
@@ -259,369 +252,130 @@ const App: React.FC = () => {
       setReturnModalState({ isOpen: true, record, item });
   };
 
-  const handleReturnConfirm = async (details: { good: number; defective: number; disposed: number }) => {
-      if (!returnModalState.record) return;
+  const handleReturnConfirm = async (details: any) => {
+      const record = returnModalState.record;
+      if (!record) return;
       
-      const result = await storage.returnItem(returnModalState.record.id, details);
+      const result = await storage.returnItem(record.id, details);
       if (result.success) {
+          if (record.borrowerEmail) {
+              await sendStatusUpdateEmail(
+                  record.borrowerEmail,
+                  record.borrowerName,
+                  'Returned',
+                  [{name: record.itemName, qty: record.quantity}],
+                  new Date().toLocaleDateString()
+              );
+          }
           await refreshData(true);
           setReturnModalState({ isOpen: false });
       } else {
-          alert(result.message || "Failed to return item.");
+          alert(result.message || "Failed to finalize return in cloud.");
       }
-  };
-
-  const handleConsume = async (item: InventoryItem) => {
-      const input = window.prompt(`Quick Use: ${item.name}\nHow much did you use? (Available: ${item.quantity - (item.borrowedQuantity || 0)})`);
-      if (!input) return;
-      
-      const qty = parseInt(input);
-      if (isNaN(qty) || qty <= 0) {
-          alert("Invalid quantity.");
-          return;
-      }
-
-      const result = await storage.consumeItem(item.id, qty);
-      if (result.success) {
-          await refreshData(true);
-      } else {
-          alert(result.message || "Failed to consume item.");
-      }
-  };
-
-  const handleUnbox = async (item: InventoryItem, boxId: string) => {
-      if (!item.boxes) return;
-      
-      const updatedBoxes = item.boxes.map(b => b.id === boxId ? { ...b, status: 'Opened' as const } : b);
-      const updatedItem = { ...item, boxes: updatedBoxes };
-      
-      const result = await storage.saveItem(updatedItem);
-      if (result.success) {
-          await refreshData(true);
-      } else {
-          alert("Failed to unbox: " + result.message);
-      }
-  };
-
-  const handleBulkReturn = async (recordIds: string[]) => {
-      confirmAction(
-        "Bulk Return",
-        `Confirm return of ${recordIds.length} selected items? (Assumes all items are returned in good condition)`,
-        async () => {
-            const result = await storage.returnItems(recordIds);
-            if (result.success) {
-                await refreshData(true);
-            } else {
-                alert("Failed to return items.");
-            }
-        }
-      );
-  };
-
-  const handleDeleteBorrowRecord = async (recordId: string) => {
-      confirmAction(
-        "Delete History Record",
-        "Are you sure you want to delete this history record? If the item is currently 'Borrowed', this will cancel the loan and restore stock count.",
-        async () => {
-            const result = await storage.deleteBorrowRecord(recordId);
-            if (result.success) {
-                await refreshData(true);
-            } else {
-                alert(result.message || "Failed to delete record.");
-            }
-        },
-        true
-      );
-  };
-
-  const handleBulkDeleteBorrowRecords = async (recordIds: string[]) => {
-       confirmAction(
-        "Delete Multiple Records",
-        `Permanently delete ${recordIds.length} records? This action cannot be undone.`,
-        async () => {
-            const result = await storage.deleteBorrowRecords(recordIds);
-            if (result.success) {
-                await refreshData(true);
-            } else {
-                alert("Failed to delete records.");
-            }
-        },
-        true
-       );
-  };
-
-  const handleSettingsSave = async (newSettings: AppSettings) => {
-      const success = await storage.saveSettings(newSettings);
-      if (success) {
-        await refreshData(true);
-      } else {
-        throw new Error("Could not save settings to database. Please check connection.");
-      }
-  };
-
-  const handlePasswordReset = async (newPassword: string) => {
-    if (settings) {
-        const updatedSettings = { ...settings, adminPassword: newPassword };
-        await storage.saveSettings(updatedSettings);
-        setSettings(updatedSettings);
-        await refreshData(true);
-    }
-  };
-
-  const openAddForm = () => {
-    setEditingItem(undefined);
-    setIsFormOpen(true);
-  };
-
-  const openEditForm = (item: InventoryItem) => {
-    setEditingItem(item);
-    setIsFormOpen(true);
-  };
-
-  const openBorrowModal = (item?: InventoryItem, specificId?: string) => {
-    setPreSelectedBorrowItem(item);
-    setBorrowSpecificId(specificId);
-    setIsBorrowModalOpen(true);
   };
 
   if (isFirstLoad) {
       return (
-          <div className="fixed inset-0 bg-slate-900 flex items-center justify-center z-50 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#0f172a] to-slate-900 animate-pulse"></div>
-              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '32px 32px' }}></div>
-              
-              <div className="relative bg-white/5 backdrop-blur-2xl border border-white/10 p-10 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm w-full mx-4 animate-in zoom-in fade-in duration-700 slide-in-from-bottom-8">
-                  <div className="mb-8 relative group">
-                      <div className="absolute inset-0 bg-blue-500 blur-3xl opacity-20 rounded-full animate-pulse group-hover:opacity-30 transition-opacity"></div>
-                      <div className="relative z-10 p-5 bg-gradient-to-tr from-white/10 to-white/5 rounded-2xl border border-white/20 shadow-lg">
-                        {settings?.logoUrl ? (
-                            <img src={settings.logoUrl} alt="Logo" className="w-20 h-20 object-contain drop-shadow-md" />
-                        ) : (
-                            <FlaskConical className="w-16 h-16 text-blue-400 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)]" />
-                        )}
-                      </div>
+          <div className="fixed inset-0 bg-slate-900 flex items-center justify-center z-50">
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#0f172a] to-slate-900"></div>
+              <div className="relative bg-white/5 backdrop-blur-2xl border border-white/10 p-10 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm w-full mx-4">
+                  <div className="mb-8 p-5 bg-gradient-to-tr from-white/10 to-white/5 rounded-2xl border border-white/20">
+                    <FlaskConical className="w-16 h-16 text-blue-400" />
                   </div>
-
-                  <h1 className="text-2xl font-bold text-white mb-2 tracking-tight text-center">
-                      {settings?.appName || 'SciLab Inventory Pro'}
-                  </h1>
-                  <p className="text-blue-200/60 text-xs font-medium uppercase tracking-widest mb-10 text-center">
-                      Laboratory Management System
-                  </p>
-
+                  <h1 className="text-2xl font-bold text-white mb-2 tracking-tight text-center">{settings?.appName || 'SciLab Pro'}</h1>
+                  <p className="text-blue-200/60 text-[10px] font-bold uppercase tracking-widest mb-10">Absolute Cloud Persistence</p>
                   <div className="w-full space-y-4">
-                      <div className="flex justify-between text-[10px] uppercase font-bold text-blue-200/60 font-mono px-1">
+                      <div className="flex justify-between text-[10px] uppercase font-bold text-blue-200/60 font-mono">
                           <span>{loadingStatus}</span>
-                          <span className="animate-pulse">...</span>
                       </div>
                       <div className="h-1 w-full bg-slate-800/50 rounded-full overflow-hidden border border-white/5">
-                          <div 
-                              className={`h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-500 rounded-full transition-all duration-700 ease-out ${loadingStatus === 'Ready' ? 'w-full' : 'w-2/3 animate-[shimmer_2s_infinite_linear]'}`} 
-                              style={{ backgroundSize: '200% 100%' }}
-                          ></div>
+                          <div className={`h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-700 w-full ${isDbConnected === false ? 'bg-red-500' : 'animate-pulse'}`}></div>
                       </div>
                   </div>
-              </div>
-              
-              <div className="absolute bottom-8 text-slate-500 text-[9px] tracking-[0.2em] uppercase font-semibold opacity-60">
-                  Secure Environment
               </div>
           </div>
       );
   }
 
-  const AppBrand = () => (
-      <div className="flex items-center space-x-3">
-          {settings?.logoUrl ? (
-              <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-lg bg-white p-0.5 border border-gray-200" />
-          ) : (
-              <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
-                 <FlaskConical className="w-6 h-6" />
-              </div>
-          )}
-          <h1 className="text-xl font-bold text-gray-800 tracking-tight">{settings?.appName}</h1>
-      </div>
-  );
-
-  if (!isAuthenticated) {
+  if (isDbConnected === false) {
       return (
-          <Login 
-            appName={settings?.appName || 'SciLab Inventory'} 
-            logoUrl={settings?.logoUrl} 
-            backgroundImageUrl={undefined}
-            customFooterText={settings?.customFooterText}
-            expectedUsername={settings?.adminUsername || 'admin'}
-            expectedPassword={settings?.adminPassword || 'admin123'}
-            recoveryEmail={settings?.recoveryEmail}
-            settings={settings || undefined} 
-            onLogin={handleLogin}
-            onPasswordReset={handlePasswordReset}
-          />
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+              <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-red-100 text-center">
+                  <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">System Disconnected</h2>
+                  <p className="text-gray-500 mb-8">This application is strictly cloud-dependent. A connection to the Supabase database is required to proceed. Please check your internet or project status.</p>
+                  <button onClick={() => refreshData(false)} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 flex items-center justify-center gap-2">
+                      <RefreshCw className="w-5 h-5" /> Reconnect Now
+                  </button>
+              </div>
+          </div>
       );
   }
+
+  if (!isAuthenticated) return <Login appName={settings?.appName || 'SciLab Inventory'} logoUrl={settings?.logoUrl} settings={settings || undefined} onLogin={handleLogin} expectedUsername={settings?.adminUsername} expectedPassword={settings?.adminPassword} />;
 
   return (
     <div className="flex h-screen text-gray-800 bg-transparent">
       <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col h-full shadow-xl z-20">
-        <div className="p-6 border-b border-gray-100 flex-shrink-0">
-           <AppBrand />
-        </div>
+        <div className="p-6 border-b border-gray-100 flex-shrink-0"><AppBrand /></div>
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <button onClick={() => setView('dashboard')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
-            <LayoutDashboard className="w-5 h-5" /><span>Dashboard</span>
-          </button>
-          <button onClick={() => setView('inventory')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'inventory' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
-            <List className="w-5 h-5" /><span>Inventory List</span>
-          </button>
-          <button onClick={() => setView('requests')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'requests' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
-            <Inbox className="w-5 h-5" /><span>Requests</span>
-          </button>
-          <button onClick={() => setView('scanner')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'scanner' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
-            <ScanLine className="w-5 h-5" /><span>Scanner / ID</span>
-          </button>
-          <button onClick={() => setView('lending')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'lending' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
-            <HandPlatter className="w-5 h-5" /><span>Lending / Borrow</span>
-          </button>
-          <button onClick={() => setView('settings')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
-            <SettingsIcon className="w-5 h-5" /><span>Settings</span>
-          </button>
+          <button onClick={() => setView('dashboard')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}><LayoutDashboard className="w-5 h-5" /><span>Dashboard</span></button>
+          <button onClick={() => setView('inventory')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'inventory' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}><List className="w-5 h-5" /><span>Inventory</span></button>
+          <button onClick={() => setView('requests')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'requests' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}><Inbox className="w-5 h-5" /><span>Requests</span></button>
+          <button onClick={() => setView('scanner')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'scanner' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}><ScanLine className="w-5 h-5" /><span>Scanner</span></button>
+          <button onClick={() => setView('lending')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'lending' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}><HandPlatter className="w-5 h-5" /><span>Lending</span></button>
+          <button onClick={() => setView('settings')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${view === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}><SettingsIcon className="w-5 h-5" /><span>Settings</span></button>
         </nav>
         <div className="p-4 border-t border-gray-100 flex-shrink-0">
-            <div className="flex flex-col items-center gap-1 mb-4">
-                 {settings?.customFooterText && <div className="text-[10px] text-gray-400 text-center px-2 font-medium uppercase tracking-wide">{settings.customFooterText}</div>}
-                 <div className="text-[9px] text-gray-400 font-mono flex items-center gap-1">
-                     <RefreshCw className={`w-2 h-2 ${isLoading ? 'animate-spin' : ''}`} />
-                     Last Synced: {lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                 </div>
+            <div className="text-[9px] text-gray-400 font-mono mb-4 flex items-center gap-1 justify-center">
+                <RefreshCw className={`w-2 h-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Last Cloud Update: {lastSynced.toLocaleTimeString()}
             </div>
-            <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-colors font-medium">
-                <LogOut className="w-5 h-5" /><span>Log Out</span>
-            </button>
+            <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-colors font-medium"><LogOut className="w-5 h-5" /><span>Log Out</span></button>
         </div>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden relative z-10">
-        <header className="bg-white/95 backdrop-blur-md border-b border-gray-200 p-4 md:hidden flex justify-between items-center flex-shrink-0 sticky top-0 z-30 shadow-sm">
-             <div className="flex items-center space-x-2">
-                {settings?.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded-md" /> : <div className="bg-blue-600 p-1.5 rounded-lg text-white"><FlaskConical className="w-5 h-5" /></div>}
-                <span className="font-bold truncate max-w-[150px] text-gray-800">{settings?.appName}</span>
-             </div>
-             <div className="flex items-center gap-2">
-                 <button onClick={() => refreshData(true)} className={`p-2 rounded-full text-gray-500 hover:bg-gray-100 ${isLoading ? 'animate-spin' : ''}`} title="Refresh Database"><RefreshCw className="w-5 h-5"/></button>
-                 <button onClick={handleLogout} className="p-2 rounded text-red-500/80 hover:bg-red-50"><LogOut className="w-5 h-5"/></button>
+        <header className="bg-white/95 backdrop-blur-md border-b border-gray-200 p-4 md:hidden flex justify-between items-center sticky top-0 z-30 shadow-sm">
+             <AppBrand />
+             <div className="flex gap-2">
+                 <button onClick={() => refreshData(true)} className={`p-2 rounded-full text-gray-500 hover:bg-gray-100 ${isLoading ? 'animate-spin' : ''}`}><RefreshCw className="w-5 h-5"/></button>
+                 <button onClick={handleLogout} className="p-2 text-red-500"><LogOut className="w-5 h-5"/></button>
              </div>
         </header>
 
         <div className="flex-1 overflow-y-auto">
             <div className="bg-white border-b border-gray-200 px-6 py-6 md:px-8 mb-6 sticky top-0 z-10 shadow-sm">
-                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-900">
-                    {view === 'dashboard' && 'Laboratory Overview'}
-                    {view === 'inventory' && 'Equipment Inventory'}
-                    {view === 'requests' && 'Borrow Requests'}
-                    {view === 'scanner' && 'Scan Barcode / ID Search'}
-                    {view === 'lending' && 'Borrowed Items'}
-                    {view === 'settings' && 'System Configuration'}
-                    </h2>
-                    <p className="text-gray-600 text-sm mt-1 font-medium">
-                        {isLoading ? 'Refreshing data...' : 'Manage your science assets efficiently.'}
-                    </p>
-                </div>
-                {view === 'inventory' && !isMobile && (
-                    <button onClick={openAddForm} className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg transition-all shadow-md font-medium hover:scale-105">
-                        <Plus className="w-5 h-5" /><span>Add Equipment</span>
-                    </button>
-                )}
+                <div className="max-w-7xl mx-auto flex justify-between items-center">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900 uppercase tracking-tight">{view}</h2>
+                        <p className="text-gray-500 text-xs font-medium uppercase tracking-widest">Live Cloud Data Source</p>
+                    </div>
+                    {view === 'inventory' && (
+                        <button onClick={() => setIsFormOpen(true)} className="flex items-center space-x-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-bold shadow-md hover:scale-105 transition-all"><Plus className="w-5 h-5" /><span>Add Equipment</span></button>
+                    )}
                 </div>
             </div>
 
             <div className="px-6 md:px-8 pb-8">
                 <div className="max-w-7xl mx-auto">
-                    {isLoading && items.length === 0 ? (
-                        <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-blue-500"/></div>
-                    ) : (
-                        <>
-                            {view === 'dashboard' && !isMobile && <Dashboard items={items} />}
-                            {view === 'inventory' && !isMobile && (
-                                <InventoryList 
-                                    items={items}
-                                    categories={categories} 
-                                    onEdit={openEditForm} 
-                                    onDelete={handleDelete} 
-                                    onShowQR={setQrItem}
-                                    onPrintBarcodes={setBarcodeItem}
-                                    onBorrow={(item) => openBorrowModal(item)}
-                                    onConsume={handleConsume}
-                                    initialSearchTerm={initialSearchTerm}
-                                />
-                            )}
-                            {view === 'requests' && !isMobile && (
-                                <RequestsList />
-                            )}
-                            {view === 'scanner' && (
-                                <Scanner 
-                                    items={items}
-                                    borrowRecords={borrowRecords}
-                                    onBorrow={openBorrowModal}
-                                    onReturn={initiateReturn}
-                                    onUnbox={handleUnbox}
-                                />
-                            )}
-                            {view === 'lending' && !isMobile && (
-                                <LendingList 
-                                    records={borrowRecords}
-                                    requests={requests}
-                                    onReturn={initiateReturn}
-                                    onReturnBulk={handleBulkReturn}
-                                    onDelete={handleDeleteBorrowRecord}
-                                    onDeleteBulk={handleBulkDeleteBorrowRecords}
-                                />
-                            )}
-                            {view === 'settings' && !isMobile && settings && (
-                                <Settings 
-                                    settings={settings}
-                                    onSave={handleSettingsSave}
-                                />
-                            )}
-                        </>
-                    )}
+                    {view === 'dashboard' && <Dashboard items={items} borrowRecords={borrowRecords} />}
+                    {view === 'inventory' && <InventoryList items={items} categories={categories} onEdit={(item) => { setEditingItem(item); setIsFormOpen(true); }} onDelete={handleDelete} onShowQR={setQrItem} onPrintBarcodes={setBarcodeItem} onBorrow={openBorrowModal} />}
+                    {view === 'requests' && <RequestsList />}
+                    {view === 'scanner' && <Scanner items={items} borrowRecords={borrowRecords} onBorrow={openBorrowModal} onReturn={initiateReturn} />}
+                    {view === 'lending' && <LendingList records={borrowRecords} requests={requests} onReturn={initiateReturn} onReturnBulk={() => {}} onDelete={handleDeleteRecord} onDeleteBulk={handleDeleteRecordsBulk} />}
+                    {view === 'settings' && settings && <Settings settings={settings} onSave={storage.saveSettings} />}
                 </div>
             </div>
         </div>
       </main>
 
-      {isFormOpen && <InventoryForm initialData={editingItem} categories={categories} onSubmit={handleSave} onCancel={() => setIsFormOpen(false)} />}
+      {isFormOpen && <InventoryForm initialData={editingItem} categories={categories} onSubmit={handleSave} onCancel={() => { setIsFormOpen(false); setEditingItem(undefined); }} />}
       {qrItem && <QRCodeModal item={qrItem} onClose={() => setQrItem(undefined)} />}
       {barcodeItem && <BulkBarcodeModal item={barcodeItem} onClose={() => setBarcodeItem(undefined)} />}
-      
-      {isBorrowModalOpen && (
-        <BorrowModal 
-            availableItems={items} 
-            initialItem={preSelectedBorrowItem} 
-            specificId={borrowSpecificId} 
-            onConfirm={handleBorrowConfirm} 
-            onCancel={() => { setIsBorrowModalOpen(false); setBorrowSpecificId(undefined); }} 
-        />
-      )}
-      
-      {returnModalState.isOpen && returnModalState.record && (
-          <ReturnModal
-            record={returnModalState.record}
-            item={returnModalState.item}
-            onConfirm={handleReturnConfirm}
-            onCancel={() => setReturnModalState({ isOpen: false })}
-          />
-      )}
-
-      <ConfirmModal 
-        isOpen={confirmModal.isOpen}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        onConfirm={confirmModal.onConfirm}
-        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-        isDestructive={confirmModal.isDestructive}
-      />
+      {isBorrowModalOpen && <BorrowModal availableItems={items} initialItem={preSelectedBorrowItem} specificId={borrowSpecificId} onConfirm={handleBorrowConfirm} onCancel={() => setIsBorrowModalOpen(false)} />}
+      {returnModalState.isOpen && returnModalState.record && <ReturnModal record={returnModalState.record} item={returnModalState.item} onConfirm={handleReturnConfirm} onCancel={() => setReturnModalState({ isOpen: false })} />}
+      <ConfirmModal isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} isDestructive={confirmModal.isDestructive} />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 
 import * as storage from './storageService';
+import * as notifications from './notificationService';
 
 /**
  * SyncService handles automated maintenance tasks for the SciLab Inventory System.
@@ -8,15 +9,28 @@ import * as storage from './storageService';
 export const performMaintenanceSync = async () => {
     console.log("[SyncService] Starting maintenance sync...");
     try {
-        // This function now persists 'Overdue' statuses into the database
-        // so that they are visible even when the app is closed.
-        const result = await storage.syncOverdueStatus();
+        const { updated } = await storage.syncOverdueStatus();
         
-        console.log(`[SyncService] Audit complete. ${result.updated} records updated to Overdue.`);
-        return { success: true, updated: result.updated };
-    } catch (e) {
-        console.error("[SyncService] Maintenance sync failed", e);
-        return { success: false, error: e };
+        if (updated.length > 0) {
+            console.log(`[SyncService] Audit complete. ${updated.length} records verified as Overdue. Triggering notifications...`);
+            
+            const settings = await storage.getSettings();
+            
+            // Loop through newly overdue records and notify borrowers
+            for (const record of updated) {
+                if (record.borrowerEmail) {
+                    await notifications.notifyBorrowerOfOverdue(settings, record);
+                }
+            }
+        } else {
+            console.log("[SyncService] Audit complete. No new overdue records found.");
+        }
+        
+        return { success: true, updatedCount: updated.length };
+    } catch (e: any) {
+        const errorMsg = e?.message || (typeof e === 'string' ? e : "Unknown database error");
+        console.error("[SyncService] Maintenance sync failed:", errorMsg);
+        return { success: false, error: errorMsg };
     }
 };
 
