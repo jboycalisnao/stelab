@@ -1,4 +1,3 @@
-
 import { InventoryItem, BorrowRecord, AppSettings, Category, ItemCondition, BorrowRequest, RequestStatus, BorrowStatus } from '../types';
 import { supabase } from '../supabaseClient';
 
@@ -22,15 +21,26 @@ const mapInventoryItem = (data: any): InventoryItem => ({
 // --- Inventory Management ---
 
 export const getInventory = async (): Promise<InventoryItem[]> => {
-    const { data, error } = await supabase.from('inventory_items').select('*');
-    if (error) throw error;
-    return (data || []).map(mapInventoryItem);
+    try {
+        const { data, error } = await supabase.from('inventory_items').select('*');
+        if (error) {
+            console.warn("Inventory fetch error (might be missing table):", error.message);
+            return [];
+        }
+        return (data || []).map(mapInventoryItem);
+    } catch (e) {
+        return [];
+    }
 };
 
 export const getInventoryItem = async (id: string): Promise<InventoryItem | null> => {
-    const { data, error } = await supabase.from('inventory_items').select('*').eq('id', id).single();
-    if (error || !data) return null;
-    return mapInventoryItem(data);
+    try {
+        const { data, error } = await supabase.from('inventory_items').select('*').eq('id', id).single();
+        if (error || !data) return null;
+        return mapInventoryItem(data);
+    } catch (e) {
+        return null;
+    }
 };
 
 export const saveItem = async (item: InventoryItem): Promise<{ success: boolean; message?: string }> => {
@@ -66,29 +76,35 @@ export const deleteItem = async (id: string): Promise<boolean> => {
 // --- App Settings ---
 
 export const getSettings = async (): Promise<AppSettings> => {
-    const { data, error } = await supabase.from('app_settings').select('*').eq('id', 1).single();
-    
-    // If no row exists yet (new project), return sensible defaults instead of crashing
-    if (error || !data) {
-        console.warn("Settings row not found in Supabase. Using default state.");
+    try {
+        const { data, error } = await supabase.from('app_settings').select('*').eq('id', 1).single();
+        
+        if (error || !data) {
+            return {
+                appName: 'SciLab Inventory Pro',
+                adminUsername: 'admin',
+                adminPassword: 'admin123'
+            };
+        }
+        
+        return {
+            appName: data.appName || 'SciLab Inventory Pro',
+            logoUrl: data.logoUrl,
+            customFooterText: data.customFooterText,
+            adminUsername: data.adminUsername || 'admin',
+            adminPassword: data.adminPassword || 'admin123',
+            recoveryEmail: data.recoveryEmail,
+            googleAppsScriptUrl: data.googleAppsScriptUrl,
+            notificationEmails: data.notificationEmails,
+            labInCharge: data.labInCharge
+        };
+    } catch (e) {
         return {
             appName: 'SciLab Inventory Pro',
             adminUsername: 'admin',
             adminPassword: 'admin123'
         };
     }
-    
-    return {
-        appName: data.appName || 'SciLab Inventory Pro',
-        logoUrl: data.logoUrl,
-        customFooterText: data.customFooterText,
-        adminUsername: data.adminUsername || 'admin',
-        adminPassword: data.adminPassword || 'admin123',
-        recoveryEmail: data.recoveryEmail,
-        googleAppsScriptUrl: data.googleAppsScriptUrl,
-        notificationEmails: data.notificationEmails,
-        labInCharge: data.labInCharge
-    };
 };
 
 export const saveSettings = async (settings: AppSettings): Promise<boolean> => {
@@ -111,52 +127,63 @@ export const saveSettings = async (settings: AppSettings): Promise<boolean> => {
 // --- Borrowing Logic ---
 
 export const getBorrowRecords = async (): Promise<BorrowRecord[]> => {
-    const { data, error } = await supabase.from('borrow_records').select('*');
-    if (error) throw error;
-    return (data || []).map((d: any) => ({
-        id: d.id,
-        itemId: d.itemid,
-        itemName: d.itemName,
-        itemCategory: d.itemCategory,
-        borrowerName: d.borrowerName,
-        borrowerId: d.borrowerId,
-        borrowerEmail: d.borrowerEmail, 
-        quantity: d.quantity,
-        borrowDate: d.borrowDate,
-        dueDate: d.dueDate,
-        returnDate: d.returnDate,
-        status: d.status as BorrowStatus,
-        specificId: d.specificId
-    }));
+    try {
+        const { data, error } = await supabase.from('borrow_records').select('*');
+        if (error) {
+            console.warn("Borrow records fetch error:", error.message);
+            return [];
+        }
+        return (data || []).map((d: any) => ({
+            id: d.id,
+            itemId: d.itemid,
+            itemName: d.itemName,
+            itemCategory: d.itemCategory,
+            borrowerName: d.borrowerName,
+            borrowerId: d.borrowerId,
+            borrowerEmail: d.borrowerEmail, 
+            quantity: d.quantity,
+            borrowDate: d.borrowDate,
+            dueDate: d.dueDate,
+            returnDate: d.returnDate,
+            status: d.status as BorrowStatus,
+            specificId: d.specificId
+        }));
+    } catch (e) {
+        return [];
+    }
 };
 
 export const syncOverdueStatus = async () => {
     const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
-        .from('borrow_records')
-        .update({ status: 'Overdue' })
-        .eq('status', 'Borrowed')
-        .lt('dueDate', today)
-        .select();
-    if (error) throw error;
-    
-    const updatedRecords: BorrowRecord[] = (data || []).map((d: any) => ({
-        id: d.id,
-        itemId: d.itemid,
-        itemName: d.itemName,
-        itemCategory: d.itemCategory,
-        borrowerName: d.borrowerName,
-        borrowerId: d.borrowerId,
-        borrowerEmail: d.borrowerEmail, 
-        quantity: d.quantity,
-        borrowDate: d.borrowDate,
-        dueDate: d.dueDate,
-        returnDate: d.returnDate,
-        status: d.status as BorrowStatus,
-        specificId: d.specificId
-    }));
+    try {
+        const { data, error } = await supabase
+            .from('borrow_records')
+            .update({ status: 'Overdue' })
+            .eq('status', 'Borrowed')
+            .lt('dueDate', today)
+            .select();
+        if (error) return { updated: [] };
+        
+        const updatedRecords: BorrowRecord[] = (data || []).map((d: any) => ({
+            id: d.id,
+            itemId: d.itemid,
+            itemName: d.itemName,
+            itemCategory: d.itemCategory,
+            borrowerName: d.borrowerName,
+            borrowerId: d.borrowerId,
+            borrowerEmail: d.borrowerEmail, 
+            quantity: d.quantity,
+            borrowDate: d.borrowDate,
+            dueDate: d.dueDate,
+            returnDate: d.returnDate,
+            status: d.status as BorrowStatus,
+            specificId: d.specificId
+        }));
 
-    return { updated: updatedRecords };
+        return { updated: updatedRecords };
+    } catch (e) {
+        return { updated: [] };
+    }
 };
 
 export const borrowItem = async (itemId: string, borrowerName: string, borrowerId: string, quantity: number, dueDate: string, borrowerEmail?: string, specificId?: string) => {
@@ -222,9 +249,13 @@ export const deleteBorrowRecord = async (id: string): Promise<boolean> => {
 // --- Categories ---
 
 export const getCategories = async (): Promise<Category[]> => {
-    const { data, error } = await supabase.from('categories').select('*');
-    if (error) throw error;
-    return data || [];
+    try {
+        const { data, error } = await supabase.from('categories').select('*');
+        if (error) return [];
+        return data || [];
+    } catch (e) {
+        return [];
+    }
 };
 
 export const addCategory = async (name: string) => {
@@ -238,23 +269,27 @@ export const deleteCategory = async (id: string) => {
 // --- Borrow Requests ---
 
 export const getBorrowRequests = async (): Promise<BorrowRequest[]> => {
-    const { data, error } = await supabase.from('borrow_requests').select('*');
-    if (error) throw error;
-    return (data || []).map((d: any) => ({
-        id: d.id,
-        referenceCode: d.referenceCode,
-        borrowerName: d.borrowerName,
-        borrowerId: d.borrowerId,
-        borrowerEmail: d.borrowerEmail,
-        instructorName: d.instructorName,
-        requestDate: d.requestDate,
-        returnDate: d.returnDate,
-        status: d.status as RequestStatus,
-        items: d.items,
-        adminNotes: d.adminNotes,
-        reservationSlot: d.reservationSlot,
-        reservationDate: d.reservationDate
-    }));
+    try {
+        const { data, error } = await supabase.from('borrow_requests').select('*');
+        if (error) return [];
+        return (data || []).map((d: any) => ({
+            id: d.id,
+            referenceCode: d.referenceCode,
+            borrowerName: d.borrowerName,
+            borrowerId: d.borrowerId,
+            borrowerEmail: d.borrowerEmail,
+            instructorName: d.instructorName,
+            requestDate: d.requestDate,
+            returnDate: d.returnDate,
+            status: d.status as RequestStatus,
+            items: d.items,
+            adminNotes: d.adminNotes,
+            reservationSlot: d.reservationSlot,
+            reservationDate: d.reservationDate
+        }));
+    } catch (e) {
+        return [];
+    }
 };
 
 export const createBorrowRequest = async (req: Partial<BorrowRequest>) => {
@@ -295,22 +330,26 @@ export const createBorrowRequest = async (req: Partial<BorrowRequest>) => {
 };
 
 export const getBorrowRequestByCode = async (code: string) => {
-    const { data, error } = await supabase.from('borrow_requests').select('*').eq('referenceCode', code).single();
-    if (error || !data) return null;
-    return {
-        id: data.id,
-        referenceCode: data.referenceCode,
-        borrowerName: data.borrowerName,
-        borrowerId: data.borrowerId,
-        borrowerEmail: data.borrowerEmail,
-        instructorName: data.instructorName,
-        requestDate: data.requestDate,
-        returnDate: data.returnDate,
-        status: data.status,
-        items: data.items,
-        reservationSlot: data.reservationSlot,
-        reservationDate: data.reservationDate
-    } as BorrowRequest;
+    try {
+        const { data, error } = await supabase.from('borrow_requests').select('*').eq('referenceCode', code).single();
+        if (error || !data) return null;
+        return {
+            id: data.id,
+            referenceCode: data.referenceCode,
+            borrowerName: data.borrowerName,
+            borrowerId: data.borrowerId,
+            borrowerEmail: data.borrowerEmail,
+            instructorName: data.instructorName,
+            requestDate: data.requestDate,
+            returnDate: data.returnDate,
+            status: data.status,
+            items: data.items,
+            reservationSlot: data.reservationSlot,
+            reservationDate: data.reservationDate
+        } as BorrowRequest;
+    } catch (e) {
+        return null;
+    }
 };
 
 export const updateBorrowRequestStatus = async (id: string, status: RequestStatus) => {

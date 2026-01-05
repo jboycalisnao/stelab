@@ -1,4 +1,3 @@
-
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Absolute source of truth for database credentials
@@ -18,16 +17,22 @@ export const supabase = client;
 
 /**
  * Validates that the cloud database is reachable by checking the settings table.
+ * Includes a safety timeout.
  */
 export const checkConnection = async (): Promise<boolean> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
   try {
     const { error } = await supabase.from('app_settings').select('id').limit(1);
+    clearTimeout(timeoutId);
     if (error) {
         console.error("Cloud Connection Verification Failed:", error.message);
         return false;
     }
     return true;
   } catch (e) {
+    clearTimeout(timeoutId);
     return false;
   }
 };

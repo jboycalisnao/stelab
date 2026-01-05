@@ -49,11 +49,9 @@ const App: React.FC = () => {
     isOpen: boolean; title: string; message: string; onConfirm: () => void; isDestructive: boolean;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, isDestructive: false });
 
-  // Dynamically update document title (Tab Name)
+  // Dynamically update document title
   useEffect(() => {
-    if (settings && settings.appName) {
-      document.title = settings.appName;
-    }
+    document.title = settings?.appName || 'SciLab Inventory Pro';
   }, [settings]);
 
   const refreshData = useCallback(async (silent = false) => {
@@ -74,10 +72,10 @@ const App: React.FC = () => {
 
           if (!silent) setLoadingStatus("Synchronizing State...");
           const [loadedItems, loadedRecords, loadedCats, loadedRequests] = await Promise.all([
-              storage.getInventory(),
-              storage.getBorrowRecords(),
-              storage.getCategories(),
-              storage.getBorrowRequests()
+              storage.getInventory().catch(() => []),
+              storage.getBorrowRecords().catch(() => []),
+              storage.getCategories().catch(() => []),
+              storage.getBorrowRequests().catch(() => [])
           ]);
           
           setItems(loadedItems);
@@ -99,9 +97,16 @@ const App: React.FC = () => {
     const auth = localStorage.getItem('scilab_auth');
     if (auth === 'true') setIsAuthenticated(true);
     
+    // Safety: ensure splash clears within 10 seconds even if refreshData hangs
+    const safetyTimer = setTimeout(() => setIsFirstLoad(false), 10000);
+
     refreshData(false).then(() => {
         sync.performMaintenanceSync();
-        setTimeout(() => setIsFirstLoad(false), 800);
+        setIsFirstLoad(false);
+        clearTimeout(safetyTimer);
+    }).catch(() => {
+        setIsFirstLoad(false);
+        clearTimeout(safetyTimer);
     });
 
     const channels = [
@@ -115,7 +120,7 @@ const App: React.FC = () => {
     const cleanupRefresh = sync.setupAutoRefresh(() => {
         refreshData(true);
         sync.performMaintenanceSync();
-    }, 300000); // 5 min auto-refresh
+    }, 300000); 
 
     return () => {
         channels.forEach(ch => supabase.removeChannel(ch));
