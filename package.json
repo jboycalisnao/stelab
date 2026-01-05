@@ -3,7 +3,7 @@
   "name": "scilab-pro-cloud",
   "version": "1.0.0",
   "description": "STE Laboratory Inventory System",
-  "main": "index.tsx",
+  "main": "main.tsx",
   "scripts": {
     "start": "vite",
     "build": "tsc && vite build",
