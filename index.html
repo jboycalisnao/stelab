@@ -12,7 +12,6 @@
           extend: {
             colors: {
               // Custom School Brand Palette
-              // Secondary Accent: #2005A2 (Blue/Purple) - Mapped to 'blue' for admin interface
               blue: {
                 50: '#eff1ff',
                 100: '#e1e4ff',
@@ -20,12 +19,11 @@
                 300: '#a3adff',
                 400: '#7e87ff',
                 500: '#585aff',
-                600: '#2005A2', // Secondary Brand Color
+                600: '#2005A2', 
                 700: '#1a0482',
                 800: '#16036b',
                 900: '#140356',
               },
-              // Main Accent: #AF1456 (Rubine Red/Maroon) - Mapped to 'maroon' for student/highlights
               maroon: {
                 50: '#fdf2f7',
                 100: '#fce7f1',
@@ -33,12 +31,11 @@
                 300: '#f7a8c8',
                 400: '#f074a3',
                 500: '#e54580',
-                600: '#AF1456', // Main Brand Color
+                600: '#AF1456', 
                 700: '#900d43',
                 800: '#780f3b',
                 900: '#651034',
               },
-              // Override red to match Main Accent (#AF1456) for destructive actions to stay on brand
               red: {
                 50: '#fdf2f7',
                 100: '#fce7f1',
@@ -68,7 +65,6 @@
 
       body {
         font-family: 'Inter', sans-serif;
-        /* Light grey to off-white moving gradient */
         background: linear-gradient(-45deg, #f3f4f6, #e2e8f0, #f8fafc, #ffffff);
         background-size: 400% 400%;
         animation: gradientBG 15s ease infinite;
@@ -76,7 +72,6 @@
         color: #1f2937;
       }
       
-      /* Custom scrollbar for better aesthetics */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;

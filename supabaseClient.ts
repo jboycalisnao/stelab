@@ -23,22 +23,22 @@ export const supabase = client;
  * Validates that the cloud database is reachable by checking the settings table.
  */
 export const checkConnection = async (): Promise<boolean> => {
-  if (!supabase.from) {
+  if (!supabase || typeof supabase.from !== 'function') {
     console.error("Supabase client was not initialized properly.");
     return false;
   }
   
   try {
-    const response = await supabase.from('app_settings').select('id').limit(1);
-    const { error, status } = response;
+    const { error, status } = await supabase
+      .from('app_settings')
+      .select('id')
+      .limit(1);
     
     if (error) {
         console.error("Cloud Connection Verification Failed (Project Error):", error.message);
-        // If it's a 404, the table might just be missing, but the connection is alive
-        // PGRST116 is 'JSON object requested, but no rows returned' (often happens with .single())
-        // But here we use .select('id').limit(1), so we check for status 404 or specific code
+        // Status 404 means table missing, PGRST116 means no rows. Both imply the connection IS working.
         if (error.code === 'PGRST116' || status === 404) {
-           console.warn("Table 'app_settings' not found, but API is reachable.");
+           console.warn("Table 'app_settings' not found or empty, but API is reachable.");
            return true; 
         }
         return false;
