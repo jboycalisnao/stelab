@@ -29,11 +29,15 @@ export const checkConnection = async (): Promise<boolean> => {
   }
   
   try {
-    const { error } = await supabase.from('app_settings').select('id').limit(1);
+    const response = await supabase.from('app_settings').select('id').limit(1);
+    const { error, status } = response;
+    
     if (error) {
         console.error("Cloud Connection Verification Failed (Project Error):", error.message);
         // If it's a 404, the table might just be missing, but the connection is alive
-        if (error.code === 'PGRST116' || error.status === 404) {
+        // PGRST116 is 'JSON object requested, but no rows returned' (often happens with .single())
+        // But here we use .select('id').limit(1), so we check for status 404 or specific code
+        if (error.code === 'PGRST116' || status === 404) {
            console.warn("Table 'app_settings' not found, but API is reachable.");
            return true; 
         }
