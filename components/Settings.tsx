@@ -57,7 +57,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
   
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  // Updated SQL Schema Snippet to include all recent field additions
+  // Updated SQL Schema Snippet for easy reference in the UI
   const SCHEMA_CODE = `-- 1. Add Lab In-Charge to Settings Table
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS "labInCharge" TEXT;
 
@@ -412,7 +412,7 @@ function performDailyMaintenance() {
                                         <li>Visit <a href="https://script.google.com" target="_blank" className="text-indigo-600 underline font-bold">Google Scripts</a></li>
                                         <li>Create a "New Project"</li>
                                         <li>Copy the code block below into the editor</li>
-                                        <li>Save and click <strong>"Deploy > New Deployment"</strong></li>
+                                        <li>Save and click <strong>"Deploy &gt; New Deployment"</strong></li>
                                     </ol>
                                 </div>
                                 <div className="space-y-2">
