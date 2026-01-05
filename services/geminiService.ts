@@ -1,9 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIAnalysisResult } from "../types";
 
-// Always use process.env.API_KEY exclusively and directly for initialization as per guidelines
-// Initializing the GenAI client with direct environment variable access
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Resolve API key in a browser-safe way. Prefer Vite client envs.
+const resolveApiKey = (): string | undefined => {
+  const fromImportMeta = (import.meta as any)?.env?.VITE_GEMINI_API_KEY as string | undefined;
+  const fromProcess = typeof process !== 'undefined' ? (process.env?.API_KEY as string | undefined) : undefined;
+  const key = (fromImportMeta || fromProcess || '').trim();
+  return key.length > 0 ? key : undefined;
+};
 
 const SYSTEM_INSTRUCTION = `
 You are an expert Laboratory Manager and Science Educator for High School laboratories. 
@@ -14,14 +18,15 @@ Include typical storage locations or handling precautions.
 `;
 
 export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult> => {
-  if (!process.env.API_KEY) {
+  const apiKey = resolveApiKey();
+  if (!apiKey) {
     throw new Error("AI Enrichment is disabled: API Key missing.");
   }
 
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `Provide inventory details for the scientific equipment or apparatus named: "${itemName}". Return structured JSON only.`;
 
   try {
-    // Using gemini-3-pro-preview for STEM tasks and complex reasoning in cataloging
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: prompt,
@@ -32,7 +37,7 @@ export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult
           type: Type.OBJECT,
           properties: {
             name: { type: Type.STRING },
-            category: { 
+            category: {
               type: Type.STRING,
               description: "Must be one of: Chemistry, Biology, Physics, Earth Science, or General"
             },
@@ -44,19 +49,16 @@ export const enrichTextData = async (itemName: string): Promise<AIAnalysisResult
       }
     });
 
-    // Directly accessing the .text property from GenerateContentResponse
-    if (response.text) {
-        const jsonStr = response.text.trim();
-        
-        try {
-            return JSON.parse(jsonStr) as AIAnalysisResult;
-        } catch (parseError) {
-            console.error("Failed to parse Gemini JSON response:", jsonStr);
-            throw new Error("Invalid JSON response from AI");
-        }
+    if ((response as any).text) {
+      const jsonStr = (response as any).text.trim();
+      try {
+        return JSON.parse(jsonStr) as AIAnalysisResult;
+      } catch (parseError) {
+        console.error("Failed to parse Gemini JSON response:", jsonStr);
+        throw new Error("Invalid JSON response from AI");
+      }
     }
     throw new Error("No response text from Gemini");
-
   } catch (error) {
     console.error("Gemini Text Enrichment Error:", error);
     throw error;

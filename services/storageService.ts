@@ -2,6 +2,12 @@
 import { InventoryItem, BorrowRecord, AppSettings, Category, ItemCondition, BorrowRequest, RequestStatus, BorrowStatus } from '../types';
 import { supabase } from '../supabaseClient';
 
+// Remove hidden metadata comment blocks that may be appended to free-text fields
+const stripMetadata = (text?: string) => {
+    if (!text) return '';
+    return text.replace(/<!--SYSTEM_META:.*?-->/g, '').trim();
+};
+
 // Helper to map DB row to InventoryItem type
 const mapInventoryItem = (data: any): InventoryItem => ({
     id: data.id,
@@ -72,7 +78,7 @@ export const getSettings = async (): Promise<AppSettings> => {
     return {
         appName: data.appName,
         logoUrl: data.logoUrl,
-        customFooterText: data.customFooterText,
+        customFooterText: stripMetadata(data.customFooterText),
         adminUsername: data.adminUsername,
         adminPassword: data.adminPassword,
         recoveryEmail: data.recoveryEmail,
@@ -87,7 +93,7 @@ export const saveSettings = async (settings: AppSettings): Promise<boolean> => {
         id: 1,
         appName: settings.appName,
         logoUrl: settings.logoUrl,
-        customFooterText: settings.customFooterText,
+        customFooterText: stripMetadata(settings.customFooterText),
         adminUsername: settings.adminUsername,
         adminPassword: settings.adminPassword,
         recoveryEmail: settings.recoveryEmail,

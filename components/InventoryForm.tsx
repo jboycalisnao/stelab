@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { InventoryItem, ItemCondition, Category, InventoryBox } from '../types';
 import { X, Box, Lock, Plus, PackageOpen, Trash2, Sparkles, Loader2 } from 'lucide-react';
-import { enrichTextData } from '../services/geminiService';
 
 interface InventoryFormProps {
   initialData?: InventoryItem;
@@ -56,6 +55,7 @@ const InventoryForm: React.FC<InventoryFormProps> = ({ initialData, categories, 
     }
     setIsEnriching(true);
     try {
+        const { enrichTextData } = await import('../services/geminiService');
         const result = await enrichTextData(formData.name);
         setFormData(prev => ({
             ...prev,
