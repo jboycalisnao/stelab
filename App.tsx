@@ -131,6 +131,27 @@ const App: React.FC = () => {
     };
   }, [refreshData, isDbConnected]);
 
+  // Reflect app name and logo in the browser tab (title + favicon)
+  useEffect(() => {
+    const name = (settings?.appName || 'SciLab Inventory Pro').trim();
+    if (name) document.title = name;
+
+    const logoUrl = settings?.logoUrl || '/favicon.svg';
+    try {
+      let link: HTMLLinkElement | null = document.querySelector("link[rel='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      const isSvg = typeof logoUrl === 'string' && logoUrl.includes('svg');
+      link.type = isSvg ? 'image/svg+xml' : 'image/png';
+      link.href = logoUrl;
+    } catch (e) {
+      console.warn('Failed to update favicon dynamically', e);
+    }
+  }, [settings]);
+
   const sendStatusUpdateEmail = async (borrowerEmail: string, borrowerName: string, status: 'Approved' | 'Released' | 'Rejected' | 'Returned', items: {name: string, qty: number}[], returnDate: string) => {
       if (!borrowerEmail || !settings?.googleAppsScriptUrl) return;
 
