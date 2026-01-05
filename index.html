@@ -6,9 +6,21 @@
     <title>SciLab Inventory Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Polyfill for process.env to support Gemini SDK and other Node-centric libraries
+      // Polyfill for process.env for Gemini SDK compatibility
       window.process = { env: { API_KEY: "" } };
       
+      // Global error tracker to help diagnose deployment issues
+      window.addEventListener('error', function(e) {
+        if (e.message.includes('Script error') || e.message.includes('Failed to fetch')) {
+          const root = document.getElementById('root');
+          if (root && root.innerHTML === '') {
+            root.innerHTML = '<div style="padding:20px;color:#ef4444;text-align:center;font-family:sans-serif;">' +
+              '<b>Module Load Error:</b> ' + e.message + '<br>' +
+              '<small>Check your internet connection or browser console for CORS/network errors.</small></div>';
+          }
+        }
+      });
+
       tailwind.config = {
         theme: {
           extend: {
@@ -77,6 +89,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>
