@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { InventoryItem, BorrowRecord, AppSettings, Category, BorrowRequest } from './types';
 import * as storage from './services/storageService';
@@ -49,11 +50,6 @@ const App: React.FC = () => {
     isOpen: boolean; title: string; message: string; onConfirm: () => void; isDestructive: boolean;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, isDestructive: false });
 
-  // Dynamically update document title
-  useEffect(() => {
-    document.title = settings?.appName || 'SciLab Inventory Pro';
-  }, [settings]);
-
   const refreshData = useCallback(async (silent = false) => {
       if (!silent) setIsLoading(true);
       try {
@@ -63,7 +59,7 @@ const App: React.FC = () => {
 
           if (!connected) {
               if (!silent) setLoadingStatus("Database Connection Failure");
-              return;
+              throw new Error("Cloud inaccessible");
           }
 
           if (!silent) setLoadingStatus("Pulling Live Configuration...");
@@ -72,10 +68,10 @@ const App: React.FC = () => {
 
           if (!silent) setLoadingStatus("Synchronizing State...");
           const [loadedItems, loadedRecords, loadedCats, loadedRequests] = await Promise.all([
-              storage.getInventory().catch(() => []),
-              storage.getBorrowRecords().catch(() => []),
-              storage.getCategories().catch(() => []),
-              storage.getBorrowRequests().catch(() => [])
+              storage.getInventory(),
+              storage.getBorrowRecords(),
+              storage.getCategories(),
+              storage.getBorrowRequests()
           ]);
           
           setItems(loadedItems);
@@ -97,18 +93,9 @@ const App: React.FC = () => {
     const auth = localStorage.getItem('scilab_auth');
     if (auth === 'true') setIsAuthenticated(true);
     
-    // Safety: ensure splash screen clears within 8 seconds regardless of API success
-    const safetyTimer = setTimeout(() => {
-        setIsFirstLoad(false);
-    }, 8000);
-
     refreshData(false).then(() => {
         sync.performMaintenanceSync();
-        setIsFirstLoad(false);
-        clearTimeout(safetyTimer);
-    }).catch(() => {
-        setIsFirstLoad(false);
-        clearTimeout(safetyTimer);
+        setTimeout(() => setIsFirstLoad(false), 800);
     });
 
     const channels = [
@@ -122,7 +109,7 @@ const App: React.FC = () => {
     const cleanupRefresh = sync.setupAutoRefresh(() => {
         refreshData(true);
         sync.performMaintenanceSync();
-    }, 300000); 
+    }, 300000); // 5 min auto-refresh
 
     return () => {
         channels.forEach(ch => supabase.removeChannel(ch));

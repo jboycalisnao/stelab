@@ -1,3 +1,4 @@
+
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Absolute source of truth for database credentials
@@ -7,6 +8,9 @@ const PRIMARY_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 let client: SupabaseClient;
 
 try {
+  if (!PRIMARY_URL || !PRIMARY_KEY) {
+    throw new Error("Supabase URL or Key is missing from the configuration.");
+  }
   client = createClient(PRIMARY_URL, PRIMARY_KEY);
 } catch (e) {
   console.error("Supabase Client Initialization Error:", e);
@@ -17,22 +21,27 @@ export const supabase = client;
 
 /**
  * Validates that the cloud database is reachable by checking the settings table.
- * Includes a safety timeout.
  */
 export const checkConnection = async (): Promise<boolean> => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-
+  if (!supabase.from) {
+    console.error("Supabase client was not initialized properly.");
+    return false;
+  }
+  
   try {
     const { error } = await supabase.from('app_settings').select('id').limit(1);
-    clearTimeout(timeoutId);
     if (error) {
-        console.error("Cloud Connection Verification Failed:", error.message);
+        console.error("Cloud Connection Verification Failed (Project Error):", error.message);
+        // If it's a 404, the table might just be missing, but the connection is alive
+        if (error.code === 'PGRST116' || error.status === 404) {
+           console.warn("Table 'app_settings' not found, but API is reachable.");
+           return true; 
+        }
         return false;
     }
     return true;
   } catch (e) {
-    clearTimeout(timeoutId);
+    console.error("Cloud Connection Verification Failed (Network Error):", e);
     return false;
   }
 };
