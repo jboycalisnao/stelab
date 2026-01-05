@@ -97,8 +97,10 @@ const App: React.FC = () => {
     const auth = localStorage.getItem('scilab_auth');
     if (auth === 'true') setIsAuthenticated(true);
     
-    // Safety: ensure splash clears within 10 seconds even if refreshData hangs
-    const safetyTimer = setTimeout(() => setIsFirstLoad(false), 10000);
+    // Safety: ensure splash screen clears within 8 seconds regardless of API success
+    const safetyTimer = setTimeout(() => {
+        setIsFirstLoad(false);
+    }, 8000);
 
     refreshData(false).then(() => {
         sync.performMaintenanceSync();

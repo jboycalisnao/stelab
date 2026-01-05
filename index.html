@@ -6,21 +6,9 @@
     <title>SciLab Inventory Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Polyfill for process.env for Gemini SDK compatibility
+      // Polyfill for process.env to support Gemini SDK and other Node-centric libraries
       window.process = { env: { API_KEY: "" } };
       
-      // Global error tracker to help diagnose deployment issues
-      window.addEventListener('error', function(e) {
-        if (e.message.includes('Script error') || e.message.includes('Failed to fetch')) {
-          const root = document.getElementById('root');
-          if (root && root.innerHTML === '') {
-            root.innerHTML = '<div style="padding:20px;color:#ef4444;text-align:center;font-family:sans-serif;">' +
-              '<b>Module Load Error:</b> ' + e.message + '<br>' +
-              '<small>Check your internet connection or browser console for CORS/network errors.</small></div>';
-          }
-        }
-      });
-
       tailwind.config = {
         theme: {
           extend: {
@@ -62,7 +50,7 @@
         height: 100vh;
       }
       #root:empty::after {
-        content: "Initializing Application...";
+        content: "System Initializing...";
         font-weight: 600;
         color: #64748b;
         animation: pulse 2s infinite;
@@ -81,8 +69,8 @@
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.46.1",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "vite": "https://esm.sh/vite@^7.3.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "vite": "https://esm.sh/vite@^7.3.0"
   }
 }
 </script>
