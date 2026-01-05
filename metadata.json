@@ -1,6 +1,6 @@
 {
-  "name": "STE Laboratory Inventory System",
-  "description": "A comprehensive High School Science Laboratory Equipment Inventory System, featuring AI-powered identification and analytics.",
+  "name": "SciLab Inventory Pro",
+  "description": "Comprehensive High School Science Laboratory Equipment and Apparatus Inventory System with AI and Cloud synchronization.",
   "requestFramePermissions": [
     "camera"
   ]

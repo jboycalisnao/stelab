@@ -2,8 +2,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Absolute source of truth for database credentials
-const PRIMARY_URL = 'https://ewwadohdfmqfbdqndrhr.supabase.co';
-const PRIMARY_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3d2Fkb2hkZm1xZmJkcW5kcmhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3NTg2MDQsImV4cCI6MjA4MDMzNDYwNH0.KU2yNQ_s8DSW3Urt39cJXzCoh02p4fynBzP8Li6x8dw';
+// We prioritize Environment Variables (Vercel) over the hardcoded fallback
+const PRIMARY_URL = process.env.SUPABASE_URL || 'https://ewwadohdfmqfbdqndrhr.supabase.co';
+const PRIMARY_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3d2Fkb2hkZm1xZmJkcW5kcmhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3NTg2MDQsImV4cCI6MjA4MDMzNDYwNH0.KU2yNQ_s8DSW3Urt39cJXzCoh02p4fynBzP8Li6x8dw';
 
 let client: SupabaseClient;
 
