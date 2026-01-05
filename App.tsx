@@ -50,6 +50,13 @@ const App: React.FC = () => {
     isOpen: boolean; title: string; message: string; onConfirm: () => void; isDestructive: boolean;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, isDestructive: false });
 
+  // Dynamically update document title (Tab Name)
+  useEffect(() => {
+    if (settings?.appName) {
+      document.title = settings.appName;
+    }
+  }, [settings?.appName]);
+
   const refreshData = useCallback(async (silent = false) => {
       if (!silent) setIsLoading(true);
       try {

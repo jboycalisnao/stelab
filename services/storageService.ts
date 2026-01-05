@@ -67,14 +67,23 @@ export const deleteItem = async (id: string): Promise<boolean> => {
 
 export const getSettings = async (): Promise<AppSettings> => {
     const { data, error } = await supabase.from('app_settings').select('*').eq('id', 1).single();
-    if (error || !data) throw error || new Error("Settings unreachable");
+    
+    // If no row exists yet (new project), return sensible defaults instead of crashing
+    if (error || !data) {
+        console.warn("Settings row not found in Supabase. Using default state.");
+        return {
+            appName: 'SciLab Inventory Pro',
+            adminUsername: 'admin',
+            adminPassword: 'admin123'
+        };
+    }
     
     return {
-        appName: data.appName,
+        appName: data.appName || 'SciLab Inventory Pro',
         logoUrl: data.logoUrl,
         customFooterText: data.customFooterText,
-        adminUsername: data.adminUsername,
-        adminPassword: data.adminPassword,
+        adminUsername: data.adminUsername || 'admin',
+        adminPassword: data.adminPassword || 'admin123',
         recoveryEmail: data.recoveryEmail,
         googleAppsScriptUrl: data.googleAppsScriptUrl,
         notificationEmails: data.notificationEmails,
